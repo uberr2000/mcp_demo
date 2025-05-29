@@ -4,6 +4,40 @@
 
 系統已完全配置好 SSE (Server-Sent Events) 協議支援，可與 n8n MCP 客戶端完美整合。
 
+## 🚀 解決方案：MCP stdio 服務器
+
+當您運行 `php artisan mcp:server` 時沒有輸出，這是正常的行為。該命令以 stdio 模式運行，等待 JSON-RPC 輸入。
+
+### 測試方法：
+
+**方法 1: 使用管道輸入**
+```bash
+echo '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":1}' | php artisan mcp:server
+```
+
+**方法 2: 使用 debug 模式查看詳細信息**
+```bash
+php artisan mcp:server --debug
+```
+
+**方法 3: 使用我們的 SSE 端點**
+```bash
+curl -X POST http://localhost:8000/mcp/sse -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":1}'
+```
+
+### ✅ 工作示例：
+
+```bash
+# 獲取工具列表
+echo '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":1}' | php artisan mcp:server
+
+# 獲取訂單
+echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_orders","arguments":{"limit":3}},"id":2}' | php artisan mcp:server
+
+# 獲取產品
+echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_products","arguments":{"limit":3}},"id":3}' | php artisan mcp:server
+```
+
 ## MCP 服務端點
 
 ### 🚀 SSE 端點 (推薦給 n8n 使用)
