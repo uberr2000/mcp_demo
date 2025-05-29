@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "laravel-mcp-demo": {
+      "command": "php",
+      "args": ["artisan", "mcp:server"],
+      "cwd": "d:\\workspace\\Demo\\mcp_demo",
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}

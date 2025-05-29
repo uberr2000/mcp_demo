@@ -69,4 +69,72 @@ class MCPService
             'tools' => $this->getTools()
         ];
     }
+
+    /**
+     * 處理 MCP initialize 請求
+     */
+    public function initialize(array $params): array
+    {
+        return [
+            'protocolVersion' => '2024-11-05',
+            'capabilities' => [
+                'tools' => [],
+                'resources' => [],
+                'prompts' => []
+            ],
+            'serverInfo' => [
+                'name' => 'Laravel MCP Demo',
+                'version' => '1.0.0'
+            ]
+        ];
+    }
+
+    /**
+     * 調用工具 (MCP 格式)
+     */
+    public function callTool(string $toolName, array $arguments): array
+    {
+        try {
+            $result = $this->executeTool($toolName, $arguments);
+            
+            return [
+                'content' => [
+                    [
+                        'type' => 'text',
+                        'text' => json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+                    ]
+                ]
+            ];
+        } catch (\Exception $e) {
+            return [
+                'content' => [
+                    [
+                        'type' => 'text',
+                        'text' => 'Error: ' . $e->getMessage()
+                    ]
+                ],
+                'isError' => true
+            ];
+        }
+    }
+
+    /**
+     * 取得 MCP 格式的工具列表
+     */
+    public function getToolsList(): array
+    {
+        return [
+            'tools' => array_map(function (MCPToolInterface $tool) {
+                return [
+                    'name' => $tool->getName(),
+                    'description' => $tool->getDescription(),
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => $tool->getInputSchema(),
+                        'required' => $this->getRequiredFields($tool->getInputSchema())
+                    ]
+                ];
+            }, $this->tools)
+        ];
+    }
 }

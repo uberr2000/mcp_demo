@@ -32,6 +32,14 @@ class ChatController extends Controller
                 'source' => 'mcp_demo_chat',
                 'user_id' => $request->session()->getId(),
                 'mcp_service_url' => url('/mcp'),
+                'mcp_sse_endpoint' => url('/mcp/sse'),
+                'mcp_stdio_endpoint' => url('/mcp/stdio'),
+                'mcp_config' => [
+                    'protocol_version' => '2024-11-05',
+                    'transport' => 'sse',
+                    'command' => 'php artisan mcp:server',
+                    'cwd' => base_path()
+                ],
                 'context' => [
                     'app_name' => config('app.name'),
                     'app_url' => config('app.url'),
