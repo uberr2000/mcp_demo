@@ -3,19 +3,20 @@
 namespace App\Services;
 
 use App\Contracts\MCPToolInterface;
-use App\MCP\Tools\OrderTool;
-use App\MCP\Tools\ProductTool;
-use App\MCP\Tools\CustomerStatsTool;
-use App\MCP\Tools\OrderAnalyticsTool;
+// Note: This service is deprecated in favor of the official php-mcp/laravel package
+// The old tools are no longer used
 
 class MCPService
 {
-    private array $tools = [];    public function __construct()
+    private array $tools = [];
+
+    public function __construct()
     {
-        $this->registerTool(new OrderTool());
-        $this->registerTool(new ProductTool());
-        $this->registerTool(new CustomerStatsTool());
-        $this->registerTool(new OrderAnalyticsTool());
+        // Commented out old tools - now using official MCP package
+        // $this->registerTool(new OrderTool());
+        // $this->registerTool(new ProductTool()); 
+        // $this->registerTool(new CustomerStatsTool());
+        // $this->registerTool(new OrderAnalyticsTool());
     }
 
     private function registerTool(MCPToolInterface $tool): void

@@ -21,7 +21,7 @@ class GetOrdersTool
         ?string $date_from = null,
         ?string $date_to = null,
         int $limit = 10
-    ): array {
+    ): string {
         $query = Order::with('product');
 
         if ($transaction_id) {
@@ -60,7 +60,9 @@ class GetOrdersTool
 
         $orders = $query->orderBy('created_at', 'desc')
                        ->limit($limit)
-                       ->get();        $result = [
+                       ->get();
+
+        $result = [
             'total' => $orders->count(),
             'orders' => $orders->map(function ($order) {
                 return [

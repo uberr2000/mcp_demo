@@ -18,7 +18,7 @@ class GetProductsTool
         ?float $max_price = null,
         ?bool $in_stock = null,
         int $limit = 10
-    ): array {
+    ): string {
         $query = Product::query();
 
         if ($name) {
@@ -47,7 +47,9 @@ class GetProductsTool
 
         $products = $query->orderBy('name')
                          ->limit($limit)
-                         ->get();        $result = [
+                         ->get();
+
+        $result = [
             'total' => $products->count(),
             'products' => $products->map(function ($product) {
                 return [

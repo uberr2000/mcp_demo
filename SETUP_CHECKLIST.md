@@ -148,10 +148,43 @@ curl -X GET http://127.0.0.1:8001/mcp/tools
 
 ## Quick Setup Script
 
+Save this as `setup.sh` (Linux/Mac) or `setup.ps1` (Windows):
+
+### For Windows PowerShell:
+```powershell
+# setup.ps1
+Write-Host "Setting up Laravel MCP Demo..."
+
+# Install dependencies
+composer install
+
+# Setup environment
+if (-not (Test-Path .env)) {
+    Copy-Item .env.example .env
+    php artisan key:generate
+}
+
+# Setup database (update .env with your database settings first)
+php artisan migrate
+php artisan db:seed
+
+# Setup MCP
+php artisan vendor:publish --tag=mcp-config --force
+php artisan config:clear
+php artisan cache:clear
+composer dump-autoload
+
+# Discover and verify
+php artisan mcp:discover
+php artisan mcp:list
+
+Write-Host "Setup complete! Tools should now be discovered."
+```
+
+### For Linux/Mac Bash:
 ```bash
 #!/bin/bash
-# Quick setup script for new server
-
+# setup.sh
 echo "Setting up Laravel MCP Demo..."
 
 # Install dependencies
@@ -168,13 +201,42 @@ php artisan migrate
 php artisan db:seed
 
 # Setup MCP
-php artisan vendor:publish --tag=mcp-config
+php artisan vendor:publish --tag=mcp-config --force
 php artisan config:clear
 php artisan cache:clear
-php artisan mcp:discover
+composer dump-autoload
 
-# Verify
+# Discover and verify
+php artisan mcp:discover
 php artisan mcp:list
 
 echo "Setup complete!"
 ```
+
+## Key Fix for "Tools: None found" Issue
+
+The most common cause is **PSR-4 autoloading conflicts**. If you see this error, run:
+
+```bash
+# Clear any conflicting directories
+rm -rf app/MCP  # Remove old uppercase directory if exists
+
+# Regenerate autoloader
+composer dump-autoload
+
+# Clear Laravel caches  
+php artisan config:clear
+php artisan cache:clear
+
+# Rediscover tools
+php artisan mcp:discover
+```
+
+## Troubleshooting
+
+If tools are still not found after setup:
+
+1. **Check directory case sensitivity**: Ensure `app/Mcp/Tools/` (not `app/MCP/Tools/`)
+2. **Verify file contents**: Make sure tool files use `namespace App\Mcp\Tools;`
+3. **Run diagnostic**: Use the provided `mcp-diagnostic.php` script
+4. **Check autoloader**: Run `composer dump-autoload -v` for verbose output

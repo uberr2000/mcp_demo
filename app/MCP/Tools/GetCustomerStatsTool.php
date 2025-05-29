@@ -12,7 +12,7 @@ class GetCustomerStatsTool
         name: 'get_customer_stats',
         description: '獲取客戶統計資訊，包括訂單數量、總消費金額、平均訂單金額等'
     )]
-    public function getCustomerStats(?string $customer_name = null): array
+    public function getCustomerStats(?string $customer_name = null): string
     {
         $query = Order::query();
 
@@ -45,7 +45,9 @@ class GetCustomerStatsTool
         ])
         ->groupBy('customer_name', 'status')
         ->get()
-        ->groupBy('customer_name');        $result = [
+        ->groupBy('customer_name');
+
+        $result = [
             'total_customers' => $stats->count(),
             'customers' => $stats->map(function ($customer) use ($statusStats) {
                 $customerStatusStats = $statusStats->get($customer->customer_name, collect());

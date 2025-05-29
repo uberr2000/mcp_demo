@@ -16,7 +16,7 @@ class GetOrderAnalyticsTool
         ?string $date_from = null,
         ?string $date_to = null,
         ?string $group_by = 'date'
-    ): array {
+    ): string {
         $query = Order::with('product');
 
         if ($date_from) {
@@ -102,7 +102,9 @@ class GetOrderAnalyticsTool
         ->groupBy('customer_name', 'customer_email')
         ->orderBy('total_spent', 'desc')
         ->limit(5)
-        ->get();        $analytics['top_customers'] = $topCustomers->toArray();
+        ->get();
+
+        $analytics['top_customers'] = $topCustomers->toArray();
 
         return json_encode($analytics, JSON_UNESCAPED_UNICODE);
     }
