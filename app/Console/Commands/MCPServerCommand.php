@@ -17,25 +17,27 @@ class MCPServerCommand extends Command
     {
         parent::__construct();
         $this->mcpService = $mcpService;
-    }
-
-    public function handle()
+    }    public function handle()
     {
         // 設置 stdio 模式
-        $this->info('Starting MCP Server with stdio transport...');
-        
         while (true) {
-            $input = trim(fgets(STDIN));
+            $input = stream_get_contents(STDIN);
             
             if (empty($input)) {
-                continue;
+                // 嘗試逐行讀取
+                $input = trim(fgets(STDIN));
+                if (empty($input)) {
+                    continue;
+                }
+            } else {
+                $input = trim($input);
             }
 
             try {
                 $request = json_decode($input, true);
                 
-                if (!$request) {
-                    $this->sendError(-32700, 'Parse error', null);
+                if (!$request || json_last_error() !== JSON_ERROR_NONE) {
+                    $this->sendError(-32700, 'Parse error: ' . json_last_error_msg(), null);
                     continue;
                 }
 
@@ -45,6 +47,11 @@ class MCPServerCommand extends Command
 
                 $result = $this->handleMethod($method, $params);
                 $this->sendResult($result, $id);
+
+                // 如果是單次調用就退出
+                if (!empty($input)) {
+                    break;
+                }
 
             } catch (\Exception $e) {
                 Log::error('MCP Server 錯誤', [
