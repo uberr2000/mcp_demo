@@ -62,7 +62,7 @@ return [
     | Use 'sse' for legacy Server-Sent Events transport with real-time capabilities.
     |
     */
-    'server_provider' => 'streamable_http',
+    'server_provider' => 'sse',
 
     /*
     |--------------------------------------------------------------------------
@@ -84,7 +84,7 @@ return [
     | The InMemory adapter stores messages in memory for testing purposes.
     |
     */
-    'sse_adapter' => 'memory',
+    'sse_adapter' => 'redis',
     'adapters' => [
         'redis' => [
             'prefix' => 'mcp_sse_',

@@ -107,10 +107,8 @@ class GetOrdersTool implements ToolInterface
 
             if (!empty($arguments['transaction_id'])) {
                 $query->where('transaction_id', 'like', "%{$arguments['transaction_id']}%");
-            }
-
-            if (!empty($arguments['customer_name'])) {
-                $query->where('customer_name', 'like', "%{$arguments['customer_name']}%");
+            }            if (!empty($arguments['customer_name'])) {
+                $query->where('name', 'like', "%{$arguments['customer_name']}%");
             }
 
             if (!empty($arguments['status'])) {
@@ -121,14 +119,12 @@ class GetOrdersTool implements ToolInterface
                 $query->whereHas('product', function ($q) use ($arguments) {
                     $q->where('name', 'like', "%{$arguments['product_name']}%");
                 });
-            }
-
-            if (isset($arguments['min_amount'])) {
-                $query->where('total_amount', '>=', $arguments['min_amount']);
+            }            if (isset($arguments['min_amount'])) {
+                $query->where('amount', '>=', $arguments['min_amount']);
             }
 
             if (isset($arguments['max_amount'])) {
-                $query->where('total_amount', '<=', $arguments['max_amount']);
+                $query->where('amount', '<=', $arguments['max_amount']);
             }
 
             if (!empty($arguments['date_from'])) {
@@ -146,16 +142,13 @@ class GetOrdersTool implements ToolInterface
 
             return [
                 'success' => true,
-                'total' => $orders->count(),
-                'orders' => $orders->map(function ($order) {
+                'total' => $orders->count(),                'orders' => $orders->map(function ($order) {
                     return [
                         'transaction_id' => $order->transaction_id,
-                        'customer_name' => $order->customer_name,
-                        'customer_email' => $order->customer_email,
+                        'customer_name' => $order->name,
                         'product_name' => $order->product->name ?? 'Unknown',
                         'quantity' => $order->quantity,
-                        'unit_price' => $order->unit_price,
-                        'total_amount' => $order->total_amount,
+                        'amount' => $order->amount,
                         'status' => $order->status,
                         'created_at' => $order->created_at->format('Y-m-d H:i:s'),
                         'updated_at' => $order->updated_at->format('Y-m-d H:i:s'),

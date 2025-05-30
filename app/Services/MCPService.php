@@ -8,15 +8,19 @@ use App\Contracts\MCPToolInterface;
 
 class MCPService
 {
-    private array $tools = [];
-
-    public function __construct()
+    private array $tools = [];    public function __construct()
     {
-        // Commented out old tools - now using official MCP package
-        // $this->registerTool(new OrderTool());
-        // $this->registerTool(new ProductTool()); 
-        // $this->registerTool(new CustomerStatsTool());
-        // $this->registerTool(new OrderAnalyticsTool());
+        // Load tools from config for SSE compatibility
+        $toolClasses = config('mcp-server.tools', []);
+        foreach ($toolClasses as $toolClass) {
+            if (class_exists($toolClass)) {
+                $modernTool = app($toolClass);
+                if ($modernTool instanceof \OPGG\LaravelMcpServer\Services\ToolService\ToolInterface) {
+                    $legacyTool = new \App\Services\LegacyToolWrapper($modernTool);
+                    $this->registerTool($legacyTool);
+                }
+            }
+        }
     }
 
     private function registerTool(MCPToolInterface $tool): void
@@ -69,9 +73,7 @@ class MCPService
             'resources' => [],
             'tools' => $this->getTools()
         ];
-    }
-
-    /**
+    }    /**
      * 處理 MCP initialize 請求
      */
     public function initialize(array $params): array
@@ -79,7 +81,7 @@ class MCPService
         return [
             'protocolVersion' => '2024-11-05',
             'capabilities' => [
-                'tools' => [],
+                'tools' => $this->getTools(),
                 'resources' => [],
                 'prompts' => []
             ],

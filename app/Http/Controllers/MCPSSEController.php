@@ -78,9 +78,7 @@ class MCPSSEController extends Controller
         $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
         return $response;
-    }
-
-    /**
+    }    /**
      * 處理 MCP 方法
      */
     private function handleMCPMethod(string $method, array $params)
