@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP SSE Test Client</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+        .panel {
+            flex: 1;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .log {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 3px;
+            height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        button {
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #005a87;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 5px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        textarea {
+            height: 100px;
+            font-family: monospace;
+        }
+        .status {
+            padding: 5px 10px;
+            border-radius: 3px;
+            margin: 5px 0;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status.connecting {
+            background: #fff3cd;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <h1>MCP SSE Test Client</h1>
+    
+    <div class="container">
+        <div class="panel">
+            <h3>Connection</h3>
+            <div id="connectionStatus" class="status disconnected">Disconnected</div>
+            <button id="connectBtn" onclick="connect()">Connect to SSE</button>
+            <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+            
+            <h4>Session Info</h4>
+            <p>Session ID: <span id="sessionId">None</span></p>
+            <p>Server URL: <span id="serverUrl">http://localhost:8001</span></p>
+        </div>
+        
+        <div class="panel">
+            <h3>Tool Testing</h3>
+            
+            <label>Tool Name:</label>
+            <select id="toolSelect">
+                <option value="get_orders">Get Orders</option>
+                <option value="get_products">Get Products</option>
+                <option value="get_customer_stats">Get Customer Stats</option>
+                <option value="get_order_analytics">Get Order Analytics</option>
+            </select>
+            
+            <label>Arguments (JSON):</label>
+            <textarea id="toolArguments" placeholder='{"limit": 5}'>{}</textarea>
+            
+            <button id="callToolBtn" onclick="callTool()" disabled>Call Tool</button>
+            <button onclick="clearLogs()">Clear Logs</button>
+        </div>
+    </div>
+    
+    <div class="panel">
+        <h3>Event Log</h3>
+        <div id="eventLog" class="log"></div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        let sessionId = null;
+        
+        const serverUrl = 'http://localhost:8001';
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const callToolBtn = document.getElementById('callToolBtn');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const sessionIdSpan = document.getElementById('sessionId');
+        const eventLog = document.getElementById('eventLog');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
+            eventLog.textContent += logEntry;
+            eventLog.scrollTop = eventLog.scrollHeight;
+            console.log(logEntry);
+        }
+        
+        function updateConnectionStatus(status, message) {
+            connectionStatus.className = `status ${status}`;
+            connectionStatus.textContent = message;
+        }
+        
+        function connect() {
+            if (eventSource) {
+                disconnect();
+            }
+            
+            updateConnectionStatus('connecting', 'Connecting...');
+            connectBtn.disabled = true;
+            
+            log('Attempting to connect to SSE endpoint...');
+            
+            eventSource = new EventSource(`${serverUrl}/mcp/sse`);
+            
+            eventSource.onopen = function(event) {
+                log('SSE connection opened successfully', 'success');
+                updateConnectionStatus('connected', 'Connected');
+                disconnectBtn.disabled = false;
+            };
+            
+            eventSource.onmessage = function(event) {
+                log(`Received message: ${event.data}`);
+                
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    // Check for session ID
+                    if (data.sessionId) {
+                        sessionId = data.sessionId;
+                        sessionIdSpan.textContent = sessionId;
+                        callToolBtn.disabled = false;
+                        log(`Session ID received: ${sessionId}`, 'success');
+                    }
+                    
+                    // Handle tool responses
+                    if (data.result) {
+                        log(`Tool response: ${JSON.stringify(data.result, null, 2)}`, 'success');
+                    }
+                    
+                    if (data.error) {
+                        log(`Tool error: ${JSON.stringify(data.error, null, 2)}`, 'error');
+                    }
+                    
+                } catch (e) {
+                    log(`Failed to parse message: ${e.message}`, 'error');
+                }
+            };
+            
+            eventSource.onerror = function(event) {
+                log(`SSE error occurred: ${event}`, 'error');
+                updateConnectionStatus('disconnected', 'Connection Error');
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                callToolBtn.disabled = true;
+                sessionId = null;
+                sessionIdSpan.textContent = 'None';
+            };
+        }
+        
+        function disconnect() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+                log('SSE connection closed', 'info');
+            }
+            
+            updateConnectionStatus('disconnected', 'Disconnected');
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            callToolBtn.disabled = true;
+            sessionId = null;
+            sessionIdSpan.textContent = 'None';
+        }
+        
+        async function callTool() {
+            if (!sessionId) {
+                log('No session ID available. Please connect first.', 'error');
+                return;
+            }
+            
+            const toolName = document.getElementById('toolSelect').value;
+            const argumentsText = document.getElementById('toolArguments').value;
+            
+            let toolArguments;
+            try {
+                toolArguments = JSON.parse(argumentsText);
+            } catch (e) {
+                log(`Invalid JSON arguments: ${e.message}`, 'error');
+                return;
+            }
+            
+            const request = {
+                sessionId: sessionId,
+                method: 'tools/call',
+                params: {
+                    name: toolName,
+                    arguments: toolArguments
+                }
+            };
+            
+            log(`Calling tool: ${toolName} with arguments: ${JSON.stringify(toolArguments)}`);
+            
+            try {
+                const response = await fetch(`${serverUrl}/mcp/message`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(request)
+                });
+                
+                if (response.ok) {
+                    log(`Tool request sent successfully`, 'success');
+                } else {
+                    const errorText = await response.text();
+                    log(`Tool request failed: ${response.status} - ${errorText}`, 'error');
+                }
+            } catch (e) {
+                log(`Failed to send tool request: ${e.message}`, 'error');
+            }
+        }
+        
+        function clearLogs() {
+            eventLog.textContent = '';
+        }
+        
+        // Set up tool-specific argument templates
+        document.getElementById('toolSelect').addEventListener('change', function() {
+            const tool = this.value;
+            const argumentsField = document.getElementById('toolArguments');
+            
+            const templates = {
+                'get_orders': JSON.stringify({
+                    "customer_name": "John",
+                    "status": "completed",
+                    "limit": 5
+                }, null, 2),
+                'get_products': JSON.stringify({
+                    "category": "electronics",
+                    "min_price": 100,
+                    "limit": 10
+                }, null, 2),
+                'get_customer_stats': JSON.stringify({
+                    "customer_name": "John",
+                    "limit": 10
+                }, null, 2),
+                'get_order_analytics': JSON.stringify({
+                    "analytics_type": "daily",
+                    "limit": 7
+                }, null, 2)
+            };
+            
+            argumentsField.value = templates[tool] || '{}';
+        });
+        
+        // Initialize with default template
+        document.getElementById('toolSelect').dispatchEvent(new Event('change'));
+        
+        log('MCP SSE Test Client initialized');
+        log('Click "Connect to SSE" to establish connection');
+    </script>
+</body>
+</html>

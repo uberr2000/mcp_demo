@@ -1,77 +1,145 @@
 <?php
 
-namespace App\Mcp\Tools;
+namespace App\MCP\Tools;
 
 use App\Models\Order;
 use Illuminate\Support\Facades\DB;
-use PhpMcp\Server\Attributes\McpTool;
+use Illuminate\Support\Facades\Validator;
+use OPGG\LaravelMcpServer\Enums\ProcessMessageType;
+use OPGG\LaravelMcpServer\Exceptions\Enums\JsonRpcErrorCode;
+use OPGG\LaravelMcpServer\Exceptions\JsonRpcErrorException;
+use OPGG\LaravelMcpServer\Services\ToolService\ToolInterface;
 
-class GetCustomerStatsTool
+class GetCustomerStatsTool implements ToolInterface
 {
-    #[McpTool(
-        name: 'get_customer_stats',
-        description: '獲取客戶統計資訊，包括訂單數量、總消費金額、平均訂單金額等'
-    )]
-    public function getCustomerStats(?string $customer_name = null): string
+    public function messageType(): ProcessMessageType
     {
-        $query = Order::query();
+        return ProcessMessageType::HTTP;
+    }
 
-        if ($customer_name) {
-            $query->where('customer_name', 'like', "%{$customer_name}%");
+    public function name(): string
+    {
+        return 'get_customer_stats';
+    }    public function description(): string
+    {
+        return 'Get customer statistics including order count, total spending, average order amount, etc.';
+    }
+
+    public function inputSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'customer_name' => [
+                    'type' => 'string',
+                    'description' => 'Customer name (partial match supported)',
+                ],
+                'date_from' => [
+                    'type' => 'string',
+                    'format' => 'date',
+                    'description' => 'Statistics start date (YYYY-MM-DD)',
+                ],
+                'date_to' => [
+                    'type' => 'string',
+                    'format' => 'date',
+                    'description' => 'Statistics end date (YYYY-MM-DD)',
+                ],
+                'status' => [
+                    'type' => 'string',
+                    'description' => 'Order status filter (pending, processing, completed, cancelled, refunded)',
+                ],
+                'limit' => [
+                    'type' => 'integer',
+                    'description' => 'Limit number of customers returned',
+                    'default' => 20,
+                    'minimum' => 1,
+                    'maximum' => 100,
+                ],
+            ],
+        ];
+    }
+
+    public function annotations(): array
+    {
+        return [];
+    }    public function execute(array $arguments): array
+    {
+        $validator = Validator::make($arguments, [
+            'customer_name' => ['nullable', 'string'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'status' => ['nullable', 'string', 'in:pending,processing,completed,cancelled,refunded'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);        if ($validator->fails()) {
+            throw new JsonRpcErrorException(
+                message: $validator->errors()->toJson(),
+                code: JsonRpcErrorCode::INVALID_REQUEST
+            );
         }
 
-        // Get customer statistics
-        $stats = $query->select([
-            'customer_name',
-            'customer_email',
-            DB::raw('COUNT(*) as total_orders'),
-            DB::raw('SUM(total_amount) as total_spent'),
-            DB::raw('AVG(total_amount) as avg_order_amount'),
-            DB::raw('MAX(total_amount) as highest_order'),
-            DB::raw('MIN(total_amount) as lowest_order'),
-            DB::raw('MAX(created_at) as last_order_date'),
-            DB::raw('MIN(created_at) as first_order_date')
-        ])
-        ->groupBy('customer_name', 'customer_email')
-        ->orderBy('total_spent', 'desc')
-        ->limit(20)
-        ->get();
+        try {            $query = Order::select([
+                'name',
+                DB::raw('COUNT(*) as total_orders'),
+                DB::raw('SUM(amount) as total_spent'),
+                DB::raw('AVG(amount) as average_order_amount'),
+                DB::raw('MAX(created_at) as last_order_date'),
+                DB::raw('MIN(created_at) as first_order_date')
+            ])
+                ->groupBy('name');
 
-        // Get status distribution for the customers
-        $statusStats = $query->select([
-            'customer_name',
-            'status',
-            DB::raw('COUNT(*) as count')
-        ])
-        ->groupBy('customer_name', 'status')
-        ->get()
-        ->groupBy('customer_name');
+            if (!empty($arguments['customer_name'])) {
+                $query->where('name', 'like', "%{$arguments['customer_name']}%");
+            }
 
-        $result = [
-            'total_customers' => $stats->count(),
-            'customers' => $stats->map(function ($customer) use ($statusStats) {
-                $customerStatusStats = $statusStats->get($customer->customer_name, collect());
-                
-                return [
-                    'customer_name' => $customer->customer_name,
-                    'customer_email' => $customer->customer_email,
-                    'total_orders' => $customer->total_orders,
-                    'total_spent' => round($customer->total_spent, 2),
-                    'avg_order_amount' => round($customer->avg_order_amount, 2),
-                    'highest_order' => round($customer->highest_order, 2),
-                    'lowest_order' => round($customer->lowest_order, 2),
-                    'first_order_date' => $customer->first_order_date,
-                    'last_order_date' => $customer->last_order_date,
-                    'order_status_breakdown' => $customerStatusStats->map(function ($statusGroup) {
-                        return [
-                            'status' => $statusGroup->first()->status,
-                            'count' => $statusGroup->sum('count')
-                        ];
-                    })->values()->toArray()
-                ];
-            })->toArray()
-        ];
+            if (!empty($arguments['date_from'])) {
+                $query->whereDate('created_at', '>=', $arguments['date_from']);
+            }
 
-        return json_encode($result, JSON_UNESCAPED_UNICODE);
+            if (!empty($arguments['date_to'])) {
+                $query->whereDate('created_at', '<=', $arguments['date_to']);
+            }
+
+            if (!empty($arguments['status'])) {
+                $query->where('status', $arguments['status']);
+            }
+
+            $limit = $arguments['limit'] ?? 20;
+            $customerStats = $query->groupBy('name')
+                                  ->orderBy('total_spent', 'desc')
+                                  ->limit($limit)
+                                  ->get();
+
+            // Calculate overall statistics
+            $overallStats = Order::selectRaw('
+                COUNT(DISTINCT name) as unique_customers,
+                COUNT(*) as total_orders,
+                SUM(amount) as total_revenue,
+                AVG(amount) as average_order_value
+            ')->first();
+
+            return [
+                'success' => true,                'overall_statistics' => [
+                    'unique_customers' => $overallStats->unique_customers,
+                    'total_orders' => $overallStats->total_orders,
+                    'total_revenue' => round($overallStats->total_revenue, 2),
+                    'average_order_value' => round($overallStats->average_order_value, 2),
+                ],
+                'customer_count' => $customerStats->count(),                'customers' => $customerStats->map(function ($customer) {
+                    return [
+                        'customer_name' => $customer->name,
+                        'total_orders' => $customer->total_orders,
+                        'total_spent' => round($customer->total_spent, 2),
+                        'average_order_amount' => round($customer->average_order_amount, 2),
+                        'first_order_date' => $customer->first_order_date,
+                        'last_order_date' => $customer->last_order_date,
+                    ];
+                })->toArray()
+            ];
+        } catch (\Exception $e) {
+            throw new JsonRpcErrorException(
+                message: "Failed to retrieve customer statistics: " . $e->getMessage(),
+                code: JsonRpcErrorCode::INTERNAL_ERROR
+            );
+        }
     }
 }

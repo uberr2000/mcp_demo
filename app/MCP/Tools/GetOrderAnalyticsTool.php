@@ -1,111 +1,237 @@
 <?php
 
-namespace App\Mcp\Tools;
+namespace App\MCP\Tools;
 
 use App\Models\Order;
 use Illuminate\Support\Facades\DB;
-use PhpMcp\Server\Attributes\McpTool;
+use Illuminate\Support\Facades\Validator;
+use OPGG\LaravelMcpServer\Enums\ProcessMessageType;
+use OPGG\LaravelMcpServer\Exceptions\Enums\JsonRpcErrorCode;
+use OPGG\LaravelMcpServer\Exceptions\JsonRpcErrorException;
+use OPGG\LaravelMcpServer\Services\ToolService\ToolInterface;
 
-class GetOrderAnalyticsTool
+class GetOrderAnalyticsTool implements ToolInterface
 {
-    #[McpTool(
-        name: 'get_order_analytics',
-        description: '獲取訂單分析資料，包括按日期、狀態、產品的統計分析'
-    )]
-    public function getOrderAnalytics(
-        ?string $date_from = null,
-        ?string $date_to = null,
-        ?string $group_by = 'date'
-    ): string {
-        $query = Order::with('product');
+    public function messageType(): ProcessMessageType
+    {
+        return ProcessMessageType::HTTP;
+    }
 
-        if ($date_from) {
-            $query->whereDate('created_at', '>=', $date_from);
-        }
+    public function name(): string
+    {
+        return 'get_order_analytics';
+    }
 
-        if ($date_to) {
-            $query->whereDate('created_at', '<=', $date_to);
-        }
+    public function description(): string
+    {
+        return '獲取訂單分析資料，包括按日期、狀態、產品的統計分析';
+    }
 
-        $analytics = [];
-
-        // Overall statistics
-        $overallStats = $query->select([
-            DB::raw('COUNT(*) as total_orders'),
-            DB::raw('SUM(total_amount) as total_revenue'),
-            DB::raw('AVG(total_amount) as avg_order_value'),
-            DB::raw('SUM(quantity) as total_items_sold')
-        ])->first();
-
-        $analytics['overall'] = [
-            'total_orders' => $overallStats->total_orders,
-            'total_revenue' => round($overallStats->total_revenue, 2),
-            'avg_order_value' => round($overallStats->avg_order_value, 2),
-            'total_items_sold' => $overallStats->total_items_sold,
+    public function inputSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'analytics_type' => [
+                    'type' => 'string',
+                    'enum' => ['daily', 'status', 'product', 'monthly'],
+                    'description' => '分析類型：daily（按日統計）、status（按狀態統計）、product（按產品統計）、monthly（按月統計）',
+                    'default' => 'daily',
+                ],
+                'date_from' => [
+                    'type' => 'string',
+                    'format' => 'date',
+                    'description' => '分析開始日期 (YYYY-MM-DD)',
+                ],
+                'date_to' => [
+                    'type' => 'string',
+                    'format' => 'date',
+                    'description' => '分析結束日期 (YYYY-MM-DD)',
+                ],
+                'status' => [
+                    'type' => 'string',
+                    'description' => '篩選特定訂單狀態（pending, completed, cancelled）',
+                ],
+                'limit' => [
+                    'type' => 'integer',
+                    'description' => '返回結果數量限制',
+                    'default' => 30,
+                    'minimum' => 1,
+                    'maximum' => 100,
+                ],
+            ],
         ];
+    }
 
-        // Group by analysis
-        switch ($group_by) {
-            case 'date':
-                $groupedData = $query->select([
-                    DB::raw('DATE(created_at) as date'),
-                    DB::raw('COUNT(*) as order_count'),
-                    DB::raw('SUM(total_amount) as revenue'),
-                    DB::raw('AVG(total_amount) as avg_order_value')
-                ])
-                ->groupBy(DB::raw('DATE(created_at)'))
-                ->orderBy('date', 'desc')
-                ->get();
-                
-                $analytics['by_date'] = $groupedData->toArray();
-                break;
+    public function annotations(): array
+    {
+        return [];
+    }
 
-            case 'status':
-                $groupedData = $query->select([
-                    'status',
-                    DB::raw('COUNT(*) as order_count'),
-                    DB::raw('SUM(total_amount) as revenue'),
-                    DB::raw('AVG(total_amount) as avg_order_value')
-                ])
-                ->groupBy('status')
-                ->orderBy('order_count', 'desc')
-                ->get();
-                
-                $analytics['by_status'] = $groupedData->toArray();
-                break;
+    public function execute(array $arguments): array
+    {
+        $validator = Validator::make($arguments, [
+            'analytics_type' => ['nullable', 'string', 'in:daily,status,product,monthly'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'status' => ['nullable', 'string', 'in:pending,completed,cancelled'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
 
-            case 'product':
-                $groupedData = $query->join('products', 'orders.product_id', '=', 'products.id')
-                ->select([
-                    'products.name as product_name',
-                    'products.category',
-                    DB::raw('COUNT(orders.id) as order_count'),
-                    DB::raw('SUM(orders.quantity) as total_quantity'),
-                    DB::raw('SUM(orders.total_amount) as revenue'),
-                    DB::raw('AVG(orders.total_amount) as avg_order_value')
-                ])
-                ->groupBy('products.id', 'products.name', 'products.category')
-                ->orderBy('revenue', 'desc')
-                ->get();
-                
-                $analytics['by_product'] = $groupedData->toArray();
-                break;
+        if ($validator->fails()) {
+            throw new JsonRpcErrorException(
+                message: $validator->errors()->toJson(),
+                code: JsonRpcErrorCode::INVALID_REQUEST
+            );
         }
 
-        // Top customers
-        $topCustomers = $query->select([
-            'customer_name',
-            'customer_email',
+        try {
+            $analyticsType = $arguments['analytics_type'] ?? 'daily';
+            $limit = $arguments['limit'] ?? 30;
+
+            $baseQuery = Order::query();
+
+            // Apply date filters
+            if (!empty($arguments['date_from'])) {
+                $baseQuery->whereDate('created_at', '>=', $arguments['date_from']);
+            }
+
+            if (!empty($arguments['date_to'])) {
+                $baseQuery->whereDate('created_at', '<=', $arguments['date_to']);
+            }
+
+            if (!empty($arguments['status'])) {
+                $baseQuery->where('status', $arguments['status']);
+            }
+
+            $analytics = [];
+
+            switch ($analyticsType) {
+                case 'daily':
+                    $analytics = $this->getDailyAnalytics($baseQuery, $limit);
+                    break;
+                case 'monthly':
+                    $analytics = $this->getMonthlyAnalytics($baseQuery, $limit);
+                    break;
+                case 'status':
+                    $analytics = $this->getStatusAnalytics($baseQuery);
+                    break;
+                case 'product':
+                    $analytics = $this->getProductAnalytics($baseQuery, $limit);
+                    break;
+            }
+
+            return [
+                'success' => true,
+                'analytics_type' => $analyticsType,
+                'data' => $analytics,
+            ];
+        } catch (\Exception $e) {
+            throw new JsonRpcErrorException(
+                message: "Failed to retrieve order analytics: " . $e->getMessage(),
+                code: JsonRpcErrorCode::INTERNAL_ERROR
+            );
+        }
+    }
+
+    private function getDailyAnalytics($query, $limit): array
+    {
+        return $query->select([            DB::raw('DATE(created_at) as date'),
             DB::raw('COUNT(*) as order_count'),
-            DB::raw('SUM(total_amount) as total_spent')
+            DB::raw('SUM(amount) as total_revenue'),
+            DB::raw('AVG(amount) as average_order_value'),
+            DB::raw('COUNT(DISTINCT name) as unique_customers')
         ])
-        ->groupBy('customer_name', 'customer_email')
-        ->orderBy('total_spent', 'desc')
-        ->limit(5)
-        ->get();
+        ->groupBy(DB::raw('DATE(created_at)'))
+        ->orderBy('date', 'desc')
+        ->limit($limit)
+        ->get()
+        ->map(function ($item) {
+            return [
+                'date' => $item->date,
+                'order_count' => $item->order_count,
+                'total_revenue' => round($item->total_revenue, 2),
+                'average_order_value' => round($item->average_order_value, 2),
+                'unique_customers' => $item->unique_customers,
+            ];
+        })
+        ->toArray();
+    }
 
-        $analytics['top_customers'] = $topCustomers->toArray();
+    private function getMonthlyAnalytics($query, $limit): array
+    {
+        return $query->select([
+            DB::raw('YEAR(created_at) as year'),            DB::raw('MONTH(created_at) as month'),
+            DB::raw('COUNT(*) as order_count'),
+            DB::raw('SUM(amount) as total_revenue'),
+            DB::raw('AVG(amount) as average_order_value'),
+            DB::raw('COUNT(DISTINCT name) as unique_customers')
+        ])
+        ->groupBy(DB::raw('YEAR(created_at)'), DB::raw('MONTH(created_at)'))
+        ->orderBy('year', 'desc')
+        ->orderBy('month', 'desc')
+        ->limit($limit)
+        ->get()
+        ->map(function ($item) {
+            return [
+                'year' => $item->year,
+                'month' => $item->month,
+                'month_name' => date('F', mktime(0, 0, 0, $item->month, 1)),
+                'order_count' => $item->order_count,
+                'total_revenue' => round($item->total_revenue, 2),
+                'average_order_value' => round($item->average_order_value, 2),
+                'unique_customers' => $item->unique_customers,
+            ];
+        })
+        ->toArray();
+    }
 
-        return json_encode($analytics, JSON_UNESCAPED_UNICODE);
+    private function getStatusAnalytics($query): array
+    {        return $query->select([
+            'status',
+            DB::raw('COUNT(*) as order_count'),
+            DB::raw('SUM(amount) as total_revenue'),
+            DB::raw('AVG(amount) as average_order_value'),
+            DB::raw('COUNT(DISTINCT name) as unique_customers')
+        ])
+        ->groupBy('status')
+        ->orderBy('order_count', 'desc')
+        ->get()
+        ->map(function ($item) {
+            return [
+                'status' => $item->status,
+                'order_count' => $item->order_count,
+                'total_revenue' => round($item->total_revenue, 2),
+                'average_order_value' => round($item->average_order_value, 2),
+                'unique_customers' => $item->unique_customers,
+            ];
+        })
+        ->toArray();
+    }
+
+    private function getProductAnalytics($query, $limit): array
+    {
+        return $query->with('product')        ->select([
+            'product_id',
+            DB::raw('COUNT(*) as order_count'),
+            DB::raw('SUM(quantity) as total_quantity'),
+            DB::raw('SUM(amount) as total_revenue'),
+            DB::raw('AVG(amount) as average_order_value')
+        ])
+        ->groupBy('product_id')
+        ->orderBy('total_revenue', 'desc')
+        ->limit($limit)
+        ->get()
+        ->map(function ($item) {
+            return [
+                'product_id' => $item->product_id,
+                'product_name' => $item->product->name ?? 'Unknown',
+                'order_count' => $item->order_count,
+                'total_quantity' => $item->total_quantity,
+                'total_revenue' => round($item->total_revenue, 2),
+                'average_order_value' => round($item->average_order_value, 2),
+            ];
+        })
+        ->toArray();
     }
 }
