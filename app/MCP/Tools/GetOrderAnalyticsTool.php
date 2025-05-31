@@ -86,6 +86,8 @@ class GetOrderAnalyticsTool implements ToolInterface
             $limit = $arguments['limit'] ?? 30;
             
             \Log::info('GetOrderAnalyticsTool arguments:', $arguments);
+            \Log::info('GetOrderAnalyticsTool status value type: ' . gettype($arguments['status'] ?? 'not set'));
+            \Log::info('GetOrderAnalyticsTool status value: ', ['status' => $arguments['status'] ?? 'not set']);
 
             $baseQuery = Order::query();
 
@@ -93,16 +95,16 @@ class GetOrderAnalyticsTool implements ToolInterface
             if (!empty($arguments['date_from'])) {
                 $baseQuery->whereDate('created_at', '>=', $arguments['date_from']);
                 \Log::info('Applied date_from filter: ' . $arguments['date_from']);
-            }
-
-            if (!empty($arguments['date_to'])) {
+            }            if (!empty($arguments['date_to'])) {
                 $baseQuery->whereDate('created_at', '<=', $arguments['date_to']);
                 \Log::info('Applied date_to filter: ' . $arguments['date_to']);
             }
 
-            if (!empty($arguments['status'])) {
+            if (isset($arguments['status']) && $arguments['status'] !== '' && $arguments['status'] !== null) {
                 $baseQuery->where('status', $arguments['status']);
                 \Log::info('Applied status filter: ' . $arguments['status']);
+            } else {
+                \Log::info('Status filter not applied. Status value: ' . json_encode($arguments['status'] ?? 'not set'));
             }
             
             \Log::info('Base query before analytics - SQL: ' . $baseQuery->toSql());
