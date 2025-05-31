@@ -100,9 +100,7 @@ class GetOrdersTool implements ToolInterface
                 message: $validator->errors()->toJson(),
                 code: JsonRpcErrorCode::INVALID_REQUEST
             );
-        }
-
-        try {
+        }        try {
             $query = Order::with('product');
 
             if (!empty($arguments['transaction_id'])) {
@@ -133,16 +131,15 @@ class GetOrdersTool implements ToolInterface
 
             if (!empty($arguments['date_to'])) {
                 $query->whereDate('created_at', '<=', $arguments['date_to']);
-            }
-
-            $limit = $arguments['limit'] ?? 10;
+            }            $limit = $arguments['limit'] ?? 10;
             $orders = $query->orderBy('created_at', 'desc')
                            ->limit($limit)
                            ->get();
 
             return [
                 'success' => true,
-                'total' => $orders->count(),                'orders' => $orders->map(function ($order) {
+                'total' => $orders->count(),                
+                'orders' => $orders->map(function ($order) {
                     return [
                         'transaction_id' => $order->transaction_id,
                         'customer_name' => $order->name,
