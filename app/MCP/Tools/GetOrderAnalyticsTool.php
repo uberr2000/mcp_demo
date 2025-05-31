@@ -217,7 +217,7 @@ class GetOrderAnalyticsTool implements ToolInterface
             DB::raw('AVG(amount) as average_order_value')
         ])
         ->groupBy('product_id')
-        ->orderBy('total_revenue', 'desc')
+        ->orderBy('total_quantity', 'desc')  // Changed from total_revenue to total_quantity for "most sold products"
         ->limit($limit)
         ->get()
         ->map(function ($item) {
