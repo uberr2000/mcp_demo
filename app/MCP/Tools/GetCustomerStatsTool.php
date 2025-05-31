@@ -75,9 +75,10 @@ class GetCustomerStatsTool implements ToolInterface
                 message: $validator->errors()->toJson(),
                 code: JsonRpcErrorCode::INVALID_REQUEST
             );
-        }
-
-        try {            $query = Order::select([
+        }        try {
+            \Log::info('GetCustomerStatsTool arguments:', $arguments);
+            
+            $query = Order::select([
                 'name',
                 DB::raw('COUNT(*) as total_orders'),
                 DB::raw('SUM(amount) as total_spent'),
@@ -101,21 +102,45 @@ class GetCustomerStatsTool implements ToolInterface
 
             if (!empty($arguments['status'])) {
                 $query->where('status', $arguments['status']);
-            }
-
-            $limit = $arguments['limit'] ?? 20;
-            $customerStats = $query->groupBy('name')
-                                  ->orderBy('total_spent', 'desc')
+            }            $limit = $arguments['limit'] ?? 20;
+            
+            \Log::info('Customer stats query SQL: ' . $query->toSql());
+            \Log::info('Customer stats query bindings: ', $query->getBindings());
+            
+            $customerStats = $query->orderBy('total_spent', 'desc')
                                   ->limit($limit)
                                   ->get();
 
-            // Calculate overall statistics
-            $overallStats = Order::selectRaw('
+            \Log::info('Customer stats found: ' . $customerStats->count());
+            \Log::info('Customer stats data: ', $customerStats->toArray());
+
+            // Calculate overall statistics with same filters
+            $overallQuery = Order::query();
+            
+            if (!empty($arguments['customer_name'])) {
+                $overallQuery->where('name', 'like', "%{$arguments['customer_name']}%");
+            }
+
+            if (!empty($arguments['date_from'])) {
+                $overallQuery->whereDate('created_at', '>=', $arguments['date_from']);
+            }
+
+            if (!empty($arguments['date_to'])) {
+                $overallQuery->whereDate('created_at', '<=', $arguments['date_to']);
+            }
+
+            if (!empty($arguments['status'])) {
+                $overallQuery->where('status', $arguments['status']);
+            }
+            
+            $overallStats = $overallQuery->selectRaw('
                 COUNT(DISTINCT name) as unique_customers,
                 COUNT(*) as total_orders,
                 SUM(amount) as total_revenue,
                 AVG(amount) as average_order_value
             ')->first();
+
+            \Log::info('Overall stats: ', $overallStats->toArray());
 
             return [
                 'success' => true,                'overall_statistics' => [
