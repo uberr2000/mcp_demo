@@ -98,11 +98,13 @@ class GetOrderAnalyticsTool implements ToolInterface
             }            if (!empty($arguments['date_to'])) {
                 $baseQuery->whereDate('created_at', '<=', $arguments['date_to']);
                 \Log::info('Applied date_to filter: ' . $arguments['date_to']);
-            }
-
-            if (isset($arguments['status']) && $arguments['status'] !== '' && $arguments['status'] !== null) {
+            }            if (isset($arguments['status']) && $arguments['status'] !== '' && $arguments['status'] !== null) {
                 $baseQuery->where('status', $arguments['status']);
                 \Log::info('Applied status filter: ' . $arguments['status']);
+            } elseif (isset($arguments['status']) && $arguments['status'] === '') {
+                // Default to 'completed' when status is empty string
+                $baseQuery->where('status', 'completed');
+                \Log::info('Applied default status filter: completed (because status was empty string)');
             } else {
                 \Log::info('Status filter not applied. Status value: ' . json_encode($arguments['status'] ?? 'not set'));
             }
