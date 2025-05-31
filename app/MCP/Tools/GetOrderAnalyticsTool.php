@@ -81,26 +81,32 @@ class GetOrderAnalyticsTool implements ToolInterface
                 message: $validator->errors()->toJson(),
                 code: JsonRpcErrorCode::INVALID_REQUEST
             );
-        }
-
-        try {
+        }        try {
             $analyticsType = $arguments['analytics_type'] ?? 'daily';
             $limit = $arguments['limit'] ?? 30;
+            
+            \Log::info('GetOrderAnalyticsTool arguments:', $arguments);
 
             $baseQuery = Order::query();
 
             // Apply date filters
             if (!empty($arguments['date_from'])) {
                 $baseQuery->whereDate('created_at', '>=', $arguments['date_from']);
+                \Log::info('Applied date_from filter: ' . $arguments['date_from']);
             }
 
             if (!empty($arguments['date_to'])) {
                 $baseQuery->whereDate('created_at', '<=', $arguments['date_to']);
+                \Log::info('Applied date_to filter: ' . $arguments['date_to']);
             }
 
             if (!empty($arguments['status'])) {
                 $baseQuery->where('status', $arguments['status']);
+                \Log::info('Applied status filter: ' . $arguments['status']);
             }
+            
+            \Log::info('Base query before analytics - SQL: ' . $baseQuery->toSql());
+            \Log::info('Base query before analytics - Bindings: ', $baseQuery->getBindings());
 
             $analytics = [];
 
@@ -205,11 +211,14 @@ class GetOrderAnalyticsTool implements ToolInterface
             ];
         })
         ->toArray();
-    }
-
-    private function getProductAnalytics($query, $limit): array
+    }    private function getProductAnalytics($query, $limit): array
     {
-        return $query->with('product')        ->select([
+        // Add debug logging to confirm status filter is applied
+        \Log::info('GetProductAnalytics - Query SQL: ' . $query->toSql());
+        \Log::info('GetProductAnalytics - Query bindings: ', $query->getBindings());
+        
+        return $query->with('product')
+        ->select([
             'product_id',
             DB::raw('COUNT(*) as order_count'),
             DB::raw('SUM(quantity) as total_quantity'),
