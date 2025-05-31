@@ -25,9 +25,7 @@ class GetOrderAnalyticsTool implements ToolInterface
     public function description(): string
     {
         return '獲取訂單分析資料，包括按日期、狀態、產品的統計分析';
-    }
-
-    public function inputSchema(): array
+    }    public function inputSchema(): array
     {
         return [
             'type' => 'object',
@@ -35,26 +33,26 @@ class GetOrderAnalyticsTool implements ToolInterface
                 'analytics_type' => [
                     'type' => 'string',
                     'enum' => ['daily', 'status', 'product', 'monthly'],
-                    'description' => '分析類型：daily（按日統計）、status（按狀態統計）、product（按產品統計）、monthly（按月統計）',
+                    'description' => '分析類型：daily（按日統計）、status（按狀態統計）、product（按產品統計）、monthly（按月統計）- Optional field (default: daily)',
                     'default' => 'daily',
                 ],
                 'date_from' => [
                     'type' => 'string',
                     'format' => 'date',
-                    'description' => '分析開始日期 (YYYY-MM-DD)',
+                    'description' => '分析開始日期 (YYYY-MM-DD) - Optional field',
                 ],
                 'date_to' => [
                     'type' => 'string',
                     'format' => 'date',
-                    'description' => '分析結束日期 (YYYY-MM-DD)',
+                    'description' => '分析結束日期 (YYYY-MM-DD) - Optional field',
                 ],
                 'status' => [
                     'type' => 'string',
-                    'description' => '篩選特定訂單狀態（pending, completed, cancelled）',
+                    'description' => '篩選特定訂單狀態（pending, completed, cancelled）- Optional field',
                 ],
                 'limit' => [
                     'type' => 'integer',
-                    'description' => '返回結果數量限制',
+                    'description' => '返回結果數量限制 - Optional field (default: 30, range: 1-100)',
                     'default' => 30,
                     'minimum' => 1,
                     'maximum' => 100,

@@ -24,50 +24,48 @@ class GetOrdersTool implements ToolInterface
     public function description(): string
     {
         return '從資料庫獲取訂單資訊，可以根據交易ID、客戶姓名、訂單狀態進行查詢';
-    }
-
-    public function inputSchema(): array
+    }    public function inputSchema(): array
     {
         return [
             'type' => 'object',
             'properties' => [
                 'transaction_id' => [
                     'type' => 'string',
-                    'description' => '交易ID（可部分匹配）',
+                    'description' => '交易ID（可部分匹配）- Optional field',
                 ],
                 'customer_name' => [
                     'type' => 'string',
-                    'description' => '客戶姓名（可部分匹配）',
+                    'description' => '客戶姓名（可部分匹配）- Optional field',
                 ],
                 'status' => [
                     'type' => 'string',
-                    'description' => '訂單狀態（pending, completed, cancelled）',
+                    'description' => '訂單狀態（pending, completed, cancelled）- Optional field',
                 ],
                 'product_name' => [
                     'type' => 'string',
-                    'description' => '產品名稱（可部分匹配）',
+                    'description' => '產品名稱（可部分匹配）- Optional field',
                 ],
                 'min_amount' => [
                     'type' => 'number',
-                    'description' => '最小金額',
+                    'description' => '最小金額 - Optional field (use 0 to ignore this filter)',
                 ],
                 'max_amount' => [
                     'type' => 'number',
-                    'description' => '最大金額',
+                    'description' => '最大金額 - Optional field (use 0 to ignore this filter)',
                 ],
                 'date_from' => [
                     'type' => 'string',
                     'format' => 'date',
-                    'description' => '開始日期 (YYYY-MM-DD)',
+                    'description' => '開始日期 (YYYY-MM-DD) - Optional field',
                 ],
                 'date_to' => [
                     'type' => 'string',
                     'format' => 'date',
-                    'description' => '結束日期 (YYYY-MM-DD)',
+                    'description' => '結束日期 (YYYY-MM-DD) - Optional field',
                 ],
                 'limit' => [
                     'type' => 'integer',
-                    'description' => '返回結果數量限制',
+                    'description' => '返回結果數量限制 - Optional field (default: 10, range: 1-100)',
                     'default' => 10,
                     'minimum' => 1,
                     'maximum' => 100,

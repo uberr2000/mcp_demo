@@ -23,34 +23,32 @@ class GetCustomerStatsTool implements ToolInterface
     }    public function description(): string
     {
         return 'Get customer statistics including order count, total spending, average order amount, etc.';
-    }
-
-    public function inputSchema(): array
+    }    public function inputSchema(): array
     {
         return [
             'type' => 'object',
             'properties' => [
                 'customer_name' => [
                     'type' => 'string',
-                    'description' => 'Customer name (partial match supported)',
+                    'description' => 'Customer name (partial match supported) - Optional field',
                 ],
                 'date_from' => [
                     'type' => 'string',
                     'format' => 'date',
-                    'description' => 'Statistics start date (YYYY-MM-DD)',
+                    'description' => 'Statistics start date (YYYY-MM-DD) - Optional field',
                 ],
                 'date_to' => [
                     'type' => 'string',
                     'format' => 'date',
-                    'description' => 'Statistics end date (YYYY-MM-DD)',
+                    'description' => 'Statistics end date (YYYY-MM-DD) - Optional field',
                 ],
                 'status' => [
                     'type' => 'string',
-                    'description' => 'Order status filter (pending, processing, completed, cancelled, refunded)',
+                    'description' => 'Order status filter (pending, processing, completed, cancelled, refunded) - Optional field',
                 ],
                 'limit' => [
                     'type' => 'integer',
-                    'description' => 'Limit number of customers returned',
+                    'description' => 'Limit number of customers returned - Optional field (default: 20, range: 1-100)',
                     'default' => 20,
                     'minimum' => 1,
                     'maximum' => 100,

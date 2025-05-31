@@ -24,36 +24,34 @@ class GetProductsTool implements ToolInterface
     public function description(): string
     {
         return '從資料庫獲取產品資訊，可以根據產品名稱、類別、價格範圍進行查詢';
-    }
-
-    public function inputSchema(): array
+    }    public function inputSchema(): array
     {
         return [
             'type' => 'object',
             'properties' => [
                 'name' => [
                     'type' => 'string',
-                    'description' => '產品名稱（可部分匹配）',
+                    'description' => '產品名稱（可部分匹配）- Optional field',
                 ],
                 'category' => [
                     'type' => 'string',
-                    'description' => '產品類別',
+                    'description' => '產品類別 - Optional field',
                 ],
                 'min_price' => [
                     'type' => 'number',
-                    'description' => '最小價格',
+                    'description' => '最小價格 - Optional field',
                 ],
                 'max_price' => [
                     'type' => 'number',
-                    'description' => '最大價格',
+                    'description' => '最大價格 - Optional field',
                 ],
                 'active' => [
                     'type' => 'boolean',
-                    'description' => '是否為活躍產品',
+                    'description' => '是否為活躍產品 - Optional field',
                 ],
                 'limit' => [
                     'type' => 'integer',
-                    'description' => '返回結果數量限制',
+                    'description' => '返回結果數量限制 - Optional field (default: 10, range: 1-100)',
                     'default' => 10,
                     'minimum' => 1,
                     'maximum' => 100,
