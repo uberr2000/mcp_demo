@@ -99,42 +99,60 @@ class GetOrdersTool implements ToolInterface
             throw new JsonRpcErrorException(
                 message: $validator->errors()->toJson(),
                 code: JsonRpcErrorCode::INVALID_REQUEST
-            );
-        }        try {
+            );        }        try {
+            \Log::info('GetOrdersTool arguments:', $arguments);
+            
             $query = Order::with('product');
 
             if (!empty($arguments['transaction_id'])) {
                 $query->where('transaction_id', 'like', "%{$arguments['transaction_id']}%");
+                \Log::info('Added transaction_id filter: ' . $arguments['transaction_id']);
             }            if (!empty($arguments['customer_name'])) {
                 $query->where('name', 'like', "%{$arguments['customer_name']}%");
+                \Log::info('Added customer_name filter: ' . $arguments['customer_name']);
             }
 
             if (!empty($arguments['status'])) {
                 $query->where('status', $arguments['status']);
+                \Log::info('Added status filter: ' . $arguments['status']);
             }
 
             if (!empty($arguments['product_name'])) {
                 $query->whereHas('product', function ($q) use ($arguments) {
                     $q->where('name', 'like', "%{$arguments['product_name']}%");
                 });
-            }            if (isset($arguments['min_amount'])) {
+                \Log::info('Added product_name filter: ' . $arguments['product_name']);
+            }
+            
+            // Fix the amount filtering logic - only apply if value is greater than 0
+            if (isset($arguments['min_amount']) && $arguments['min_amount'] > 0) {
                 $query->where('amount', '>=', $arguments['min_amount']);
+                \Log::info('Added min_amount filter: ' . $arguments['min_amount']);
             }
 
-            if (isset($arguments['max_amount'])) {
+            if (isset($arguments['max_amount']) && $arguments['max_amount'] > 0) {
                 $query->where('amount', '<=', $arguments['max_amount']);
+                \Log::info('Added max_amount filter: ' . $arguments['max_amount']);
             }
 
             if (!empty($arguments['date_from'])) {
                 $query->whereDate('created_at', '>=', $arguments['date_from']);
+                \Log::info('Added date_from filter: ' . $arguments['date_from']);
             }
 
             if (!empty($arguments['date_to'])) {
                 $query->whereDate('created_at', '<=', $arguments['date_to']);
+                \Log::info('Added date_to filter: ' . $arguments['date_to']);
             }            $limit = $arguments['limit'] ?? 10;
+            
+            \Log::info('Final query SQL: ' . $query->toSql());
+            \Log::info('Query bindings: ', $query->getBindings());
+            
             $orders = $query->orderBy('created_at', 'desc')
                            ->limit($limit)
                            ->get();
+
+            \Log::info('Orders found: ' . $orders->count());
 
             return [
                 'success' => true,
