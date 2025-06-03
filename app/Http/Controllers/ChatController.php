@@ -27,7 +27,7 @@ class ChatController extends Controller
         try {
             // 發送消息到 n8n webhook
             $response = Http::timeout(30)->post($n8nWebhookUrl, [
-                'message' => $userMessage,
+                'chatInput' => $userMessage,
                 'timestamp' => now()->toISOString(),
                 'source' => 'mcp_demo_chat',
                 'user_id' => $request->session()->getId(),
@@ -51,6 +51,8 @@ class ChatController extends Controller
                     ]
                 ]
             ]);
+
+            return $this->response->json($response->json());
 
             if ($response->successful()) {
                 $responseData = $response->json();

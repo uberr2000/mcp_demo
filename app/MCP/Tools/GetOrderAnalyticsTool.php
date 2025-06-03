@@ -169,7 +169,8 @@ class GetOrderAnalyticsTool implements ToolInterface
     private function getMonthlyAnalytics($query, $limit): array
     {
         return $query->select([
-            DB::raw('YEAR(created_at) as year'),            DB::raw('MONTH(created_at) as month'),
+            DB::raw('YEAR(created_at) as year'),            
+            DB::raw('MONTH(created_at) as month'),
             DB::raw('COUNT(*) as order_count'),
             DB::raw('SUM(amount) as total_revenue'),
             DB::raw('AVG(amount) as average_order_value'),

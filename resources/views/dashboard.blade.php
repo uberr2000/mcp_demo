@@ -82,42 +82,16 @@
             
             <!-- Chat Section -->
             <div class="lg:col-span-1">
-                <div class="bg-white rounded-lg shadow-md p-6 h-full">                    <h2 class="text-2xl font-semibold text-gray-700 mb-4">n8n AI 助手</h2>
+                <div class="bg-white rounded-lg shadow-md p-6 h-full">        
+                    <link href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css" rel="stylesheet" />
+                    <script type="module">
+                        import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
+
+                        createChat({
+                            webhookUrl: 'https://autoflow.ink.net.tw/webhook/96c0bbee-192e-4913-b23a-5fc7c805b3a3/chat'
+                        });
+                    </script>            
                     
-                    <div id="chat-messages" class="h-64 overflow-y-auto border border-gray-200 rounded-lg p-4 mb-4 bg-gray-50">
-                        <div class="text-gray-500 text-sm">
-                            <div class="mb-2 text-green-600 font-medium">🤖 已連接到 n8n AI 工作流程</div>
-                            您可以詢問關於訂單和產品的問題，AI 會通過 MCP 服務查詢資料：<br>
-                            <div class="mt-2 space-y-1">
-                                <div>• "顯示最近 5 筆已完成的訂單"</div>
-                                <div>• "TXN000001 的訂單詳情是什麼？"</div>
-                                <div>• "陳大明有多少筆訂單？"</div>
-                                <div>• "分析一下訂單狀態分布"</div>
-                                <div>• "有什麼飲料產品？"</div>
-                                <div>• "最受歡迎的產品是什麼？"</div>
-                            </div>
-                            <div class="mt-3 text-xs text-blue-600">
-                                ⚡ 通過 n8n webhook 整合，支援 MCP 工具調用
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <form id="chat-form" class="flex">
-                        <input type="text" id="chat-input" placeholder="輸入您的問題..." 
-                               class="flex-1 px-3 py-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <button type="submit" 
-                                class="px-4 py-2 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            發送
-                        </button>
-                    </form>
-                    
-                    <div id="loading" class="hidden mt-2 text-center">
-                        <div class="inline-flex items-center">
-                            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                            <span class="ml-2 text-sm text-gray-600">AI 正在思考...</span>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     </div>

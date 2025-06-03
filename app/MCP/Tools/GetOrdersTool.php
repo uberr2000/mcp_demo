@@ -143,6 +143,12 @@ class GetOrdersTool implements ToolInterface
                 \Log::info('Added date_to filter: ' . $arguments['date_to']);
             }            $limit = $arguments['limit'] ?? 10;
             
+            if (empty($arguments['date_from']) && empty($arguments['date_to'])) {
+                // 如果沒有指定日期，默認查詢最近30天
+                $arguments['date_from'] = now()->subDays(30)->format('Y-m-d');
+                $arguments['date_to'] = now()->format('Y-m-d');
+            }
+
             \Log::info('Final query SQL: ' . $query->toSql());
             \Log::info('Query bindings: ', $query->getBindings());
             
