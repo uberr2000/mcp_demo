@@ -1,0 +1,74 @@
+{
+  "type": "function",
+  "function": {
+    "name": "send_excel_email",
+    "description": "生成並通過 Amazon SES 發送訂單或產品的 Excel 文件到指定郵箱",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["orders", "products"],
+          "description": "要導出的數據類型：orders(訂單) 或 products(產品)"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "接收Excel文件的郵箱地址"
+        },
+        "subject": {
+          "type": "string",
+          "description": "郵件主題 - Optional field (default: 系統自動生成)"
+        },
+        "message": {
+          "type": "string",
+          "description": "郵件內容 - Optional field (default: 系統自動生成)"
+        },
+        "filters": {
+          "type": "object",
+          "description": "篩選條件 - Optional field",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["pending", "processing", "completed", "cancelled"],
+              "description": "訂單狀態篩選（僅適用於訂單導出）"
+            },
+            "customer_name": {
+              "type": "string",
+              "description": "客戶姓名篩選（僅適用於訂單導出）"
+            },
+            "product_name": {
+              "type": "string",
+              "description": "產品名稱篩選"
+            },
+            "date_from": {
+              "type": "string",
+              "format": "date",
+              "description": "開始日期 (YYYY-MM-DD format)"
+            },
+            "date_to": {
+              "type": "string",
+              "format": "date",
+              "description": "結束日期 (YYYY-MM-DD format)"
+            },
+            "category": {
+              "type": "string",
+              "description": "產品類別篩選（僅適用於產品導出）"
+            },
+            "active": {
+              "type": "boolean",
+              "description": "是否啟用篩選（僅適用於產品導出）"
+            }
+          }
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "description": "導出記錄數量限制 - Optional field (default: 1000, max: 10000)"
+        }
+      },
+      "required": ["type", "email"]
+    }
+  }
+}

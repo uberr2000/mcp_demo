@@ -113,6 +113,7 @@ return [
         \App\MCP\Tools\GetProductsTool::class,
         \App\MCP\Tools\GetCustomerStatsTool::class,
         \App\MCP\Tools\GetOrderAnalyticsTool::class,
+        \App\MCP\Tools\SendExcelEmailTool::class,
     ],
 
     /*
