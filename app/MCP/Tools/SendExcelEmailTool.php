@@ -127,34 +127,54 @@ class SendExcelEmailTool implements ToolInterface
                     '無效的郵箱地址格式',
                     JsonRpcErrorCode::INVALID_PARAMS
                 );
-            }
-
-            // Generate filename with timestamp
+            }            // Generate filename with timestamp
             $timestamp = now()->format('Y-m-d_H-i-s');
             $filename = "{$type}_export_{$timestamp}.xlsx";
             $filePath = "exports/{$filename}";
 
-            // Generate Excel file based on type
+            // Ensure the exports directory exists
+            if (!Storage::exists('exports')) {
+                Storage::makeDirectory('exports');
+            }            // Generate Excel file based on type
             if ($type === 'orders') {
                 $data = $this->getOrdersData($filters, $limit);
+                
+                // Log data for debugging
+                Log::info('Orders data retrieved:', ['count' => count($data), 'sample' => array_slice($data, 0, 2)]);
+                
                 Excel::store(new OrdersExport($data), $filePath, 'local');
                 
                 $defaultSubject = "訂單數據導出 - {$timestamp}";
                 $defaultMessage = "附件包含您請求的訂單數據導出文件。\n\n導出時間：{$timestamp}\n記錄數量：" . count($data);
             } else {
                 $data = $this->getProductsData($filters, $limit);
+                
+                // Log data for debugging
+                Log::info('Products data retrieved:', ['count' => count($data), 'sample' => array_slice($data, 0, 2)]);
+                
                 Excel::store(new ProductsExport($data), $filePath, 'local');
                 
                 $defaultSubject = "產品數據導出 - {$timestamp}";
                 $defaultMessage = "附件包含您請求的產品數據導出文件。\n\n導出時間：{$timestamp}\n記錄數量：" . count($data);
             }
 
+            // Verify the Excel file was created
+            if (!Storage::exists($filePath)) {
+                throw new \Exception("Excel file was not created at path: {$filePath}");
+            }
+
+            // Log file creation success
+            $fileSize = Storage::size($filePath);
+            Log::info('Excel file created successfully:', [
+                'path' => $filePath,
+                'size' => $fileSize,
+                'full_path' => storage_path("app/{$filePath}")
+            ]);
+
             // Use default subject/message if not provided
             $emailSubject = $subject ?? $defaultSubject;
-            $emailMessage = $message ?? $defaultMessage;
-
-            // Send email with Excel attachment via SES
-            $fullPath = storage_path("app/{$filePath}");
+            $emailMessage = $message ?? $defaultMessage;            // Send email with Excel attachment via SES
+            $fullPath = Storage::disk('local')->path($filePath);
               Mail::send([], [], function ($mail) use ($email, $emailSubject, $emailMessage, $fullPath, $filename) {
                 $mail->to($email)
                      ->subject($emailSubject)

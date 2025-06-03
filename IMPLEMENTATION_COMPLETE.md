@@ -12,10 +12,13 @@ Your MCP tool for sending Excel files via Amazon SES is now **fully implemented,
 - ✅ **Tool Registration** - Added to `config/mcp-server.php`
 - ✅ **AWS SES Configuration** - Set up in `.env` and `config/mail.php`
 
-### 🐛 Critical Bug Fixed
-**Issue**: `JsonRpcErrorException` constructor parameters were in wrong order
-**Fixed**: Changed from `(JsonRpcErrorCode $code, string $message)` to `(string $message, JsonRpcErrorCode $code)`
-**Result**: Error handling now works correctly (tested with error code -32602)
+### 🐛 Critical Bugs Fixed
+1. **JsonRpcErrorException Bug**: Fixed constructor parameter order `(string $message, JsonRpcErrorCode $code)`
+2. **Storage Path Bug**: Fixed file path resolution using `Storage::disk('local')->path()` instead of `storage_path()`
+3. **Directory Creation**: Added automatic creation of exports directory
+4. **Laravel Mail Integration**: Replaced `setBody()` with `text()` method
+
+**Result**: All file handling and error reporting now works correctly ✅
 
 ### 📊 Query Payload Validation
 Your provided query payload is **100% compatible**:
