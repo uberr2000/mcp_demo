@@ -41,10 +41,9 @@ class GetCustomerStatsTool implements ToolInterface
                     'type' => 'string',
                     'format' => 'date',
                     'description' => 'Statistics end date (YYYY-MM-DD) - Optional field',
-                ],
-                'status' => [
+                ],                'status' => [
                     'type' => 'string',
-                    'description' => 'Order status filter (pending, processing, completed, cancelled, refunded) - Optional field',
+                    'description' => 'Order status filter (pending, processing, completed, cancelled, refunded, all) - Optional field. Use "all" to include all statuses',
                 ],
                 'limit' => [
                     'type' => 'integer',
@@ -66,7 +65,7 @@ class GetCustomerStatsTool implements ToolInterface
             'customer_name' => ['nullable', 'string'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
-            'status' => ['nullable', 'string', 'in:pending,processing,completed,cancelled,refunded'],
+            'status' => ['nullable', 'string', 'in:pending,processing,completed,cancelled,refunded,all'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);        if ($validator->fails()) {
             throw new JsonRpcErrorException(
@@ -96,11 +95,15 @@ class GetCustomerStatsTool implements ToolInterface
 
             if (!empty($arguments['date_to'])) {
                 $query->whereDate('created_at', '<=', $arguments['date_to']);
-            }
-
-            if (!empty($arguments['status'])) {
-                $query->where('status', $arguments['status']);
-            }            $limit = $arguments['limit'] ?? 20;
+            }            if (!empty($arguments['status'])) {
+                if ($arguments['status'] === 'all') {
+                    // Don't apply any status filter when "all" is specified
+                    \Log::info('Status filter set to "all" - no status filtering applied');
+                } else {
+                    $query->where('status', $arguments['status']);
+                    \Log::info('Applied status filter: ' . $arguments['status']);
+                }
+            }$limit = $arguments['limit'] ?? 20;
             
             \Log::info('Customer stats query SQL: ' . $query->toSql());
             \Log::info('Customer stats query bindings: ', $query->getBindings());
@@ -125,10 +128,14 @@ class GetCustomerStatsTool implements ToolInterface
 
             if (!empty($arguments['date_to'])) {
                 $overallQuery->whereDate('created_at', '<=', $arguments['date_to']);
-            }
-
-            if (!empty($arguments['status'])) {
-                $overallQuery->where('status', $arguments['status']);
+            }            if (!empty($arguments['status'])) {
+                if ($arguments['status'] === 'all') {
+                    // Don't apply any status filter when "all" is specified
+                    \Log::info('Overall stats: Status filter set to "all" - no status filtering applied');
+                } else {
+                    $overallQuery->where('status', $arguments['status']);
+                    \Log::info('Overall stats: Applied status filter: ' . $arguments['status']);
+                }
             }
             
             $overallStats = $overallQuery->selectRaw('

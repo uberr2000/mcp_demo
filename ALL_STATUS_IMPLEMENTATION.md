@@ -1,7 +1,7 @@
 # All Status Support Implementation Summary
 
 ## Overview
-All three MCP tools (`GetOrderAnalyticsTool`, `GetOrdersTool`, and `SendExcelEmailTool`) now fully support the "all" status parameter to search, analyze, and export all orders regardless of their status.
+All four MCP tools (`GetOrderAnalyticsTool`, `GetOrdersTool`, `SendExcelEmailTool`, and `GetCustomerStatsTool`) now fully support the "all" status parameter to search, analyze, and export all orders regardless of their status.
 
 ## Changes Made
 
@@ -19,6 +19,11 @@ All three MCP tools (`GetOrderAnalyticsTool`, `GetOrdersTool`, and `SendExcelEma
 - ✅ **Schema**: Enum includes "all" option, description updated to mention "all" usage
 - ✅ **Logic**: Implemented to skip status filtering when filters.status="all"
 - ✅ **Export**: Now supports exporting orders of all statuses to Excel files
+
+### 4. GetCustomerStatsTool.php
+- ✅ **Schema**: Input schema description updated to mention "all" status option
+- ✅ **Validation**: Validation rules include "all" as valid value (`'in:pending,processing,completed,cancelled,refunded,all'`)
+- ✅ **Logic**: Implemented to skip status filtering when status="all" for both main query and overall stats
 
 ## Implementation Details
 
@@ -69,6 +74,14 @@ Both tools validate the status parameter with:
 }
 ```
 
+### Customer Statistics with All Statuses
+```json
+{
+    "customer_name": "何淑儀",
+    "status": "all",
+    "limit": 1
+}
+```
 ### Excel Export Tool with All Statuses
 ```json
 {
@@ -86,15 +99,17 @@ Both tools validate the status parameter with:
 ## Benefits
 - **Comprehensive Analysis**: Users can now analyze data across all order statuses
 - **Flexible Filtering**: Option to view specific status or all statuses
-- **Consistent Behavior**: All three tools handle "all" status uniformly
+- **Consistent Behavior**: All four tools handle "all" status uniformly
 - **Complete Export**: Excel exports can include orders of all statuses
+- **Customer Insights**: Customer statistics across all order statuses
 - **Better UX**: No need to make multiple API calls for different statuses
 
 ## Testing
-- ✅ Schema validation tests pass for all three tools
+- ✅ Schema validation tests pass for all four tools
 - ✅ Input validation includes "all" as valid option
 - ✅ Logic correctly skips status filtering when "all" is specified
 - ✅ All tools consistent in implementation
 - ✅ Excel export tool properly handles "all" status in filters
+- ✅ Customer stats tool supports "all" status for comprehensive customer analysis
 
 The implementation is now complete and ready for production use across all MCP tools.
