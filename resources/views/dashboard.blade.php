@@ -14,9 +14,113 @@
         
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <!-- Orders Section -->
-            <div class="lg:col-span-2">
-                <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="lg:col-span-2">                <div class="bg-white rounded-lg shadow-md p-6">
                     <h2 class="text-2xl font-semibold text-gray-700 mb-4">訂單列表</h2>
+                    
+                    <!-- Search Form -->
+                    <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                        <form method="GET" action="{{ route('dashboard') }}" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div>
+                                <label for="customer_name" class="block text-sm font-medium text-gray-700 mb-1">客戶姓名</label>
+                                <input type="text" 
+                                       id="customer_name" 
+                                       name="customer_name" 
+                                       value="{{ request('customer_name') }}"
+                                       placeholder="搜尋客戶姓名..."
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            </div>
+                            
+                            <div>
+                                <label for="status" class="block text-sm font-medium text-gray-700 mb-1">訂單狀態</label>
+                                <select id="status" 
+                                        name="status" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    <option value="">所有狀態</option>
+                                    @foreach($statuses as $status)
+                                        <option value="{{ $status }}" {{ request('status') == $status ? 'selected' : '' }}>
+                                            {{ ucfirst($status) }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label for="product_name" class="block text-sm font-medium text-gray-700 mb-1">產品名稱</label>
+                                <input type="text" 
+                                       id="product_name" 
+                                       name="product_name" 
+                                       value="{{ request('product_name') }}"
+                                       placeholder="搜尋產品名稱..."
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            </div>
+                            
+                            <div>
+                                <label for="date_from" class="block text-sm font-medium text-gray-700 mb-1">開始日期</label>
+                                <input type="date" 
+                                       id="date_from" 
+                                       name="date_from" 
+                                       value="{{ request('date_from') }}"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            </div>
+                            
+                            <div>
+                                <label for="date_to" class="block text-sm font-medium text-gray-700 mb-1">結束日期</label>
+                                <input type="date" 
+                                       id="date_to" 
+                                       name="date_to" 
+                                       value="{{ request('date_to') }}"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            </div>
+                            
+                            <div class="flex items-end gap-2">
+                                <button type="submit" 
+                                        class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
+                                    <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                    </svg>
+                                    搜尋
+                                </button>
+                                <a href="{{ route('dashboard') }}" 
+                                   class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors">
+                                    <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                    </svg>
+                                    重置
+                                </a>
+                            </div>
+                        </form>
+                        
+                        <!-- Search Results Summary -->
+                        @if(request()->hasAny(['customer_name', 'status', 'product_name', 'date_from', 'date_to']))
+                            <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                <div class="flex items-center">
+                                    <svg class="w-4 h-4 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    <span class="text-blue-800 text-sm font-medium">
+                                        搜尋結果：共找到 {{ $orders->total() }} 筆符合條件的訂單
+                                    </span>
+                                </div>
+                                <div class="mt-2 text-xs text-blue-600">
+                                    @if(request('customer_name'))
+                                        <span class="inline-block bg-blue-100 px-2 py-1 rounded mr-2">客戶：{{ request('customer_name') }}</span>
+                                    @endif
+                                    @if(request('status'))
+                                        <span class="inline-block bg-blue-100 px-2 py-1 rounded mr-2">狀態：{{ request('status') }}</span>
+                                    @endif
+                                    @if(request('product_name'))
+                                        <span class="inline-block bg-blue-100 px-2 py-1 rounded mr-2">產品：{{ request('product_name') }}</span>
+                                    @endif
+                                    @if(request('date_from'))
+                                        <span class="inline-block bg-blue-100 px-2 py-1 rounded mr-2">開始：{{ request('date_from') }}</span>
+                                    @endif
+                                    @if(request('date_to'))
+                                        <span class="inline-block bg-blue-100 px-2 py-1 rounded mr-2">結束：{{ request('date_to') }}</span>
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
+                    </div>
                     
                     <div class="overflow-x-auto">
                         <table class="min-w-full table-auto">
@@ -94,14 +198,41 @@
                     
             </div>
         </div>
-    </div>
-
-    <script>
+    </div>    <script>
         $(document).ready(function() {
             $.ajaxSetup({
                 headers: {
                     'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                 }
+            });
+
+            // Auto-submit search form on status change
+            $('#status').on('change', function() {
+                $(this).closest('form').submit();
+            });
+
+            // Auto-submit search form on date change
+            $('#date_from, #date_to').on('change', function() {
+                $(this).closest('form').submit();
+            });
+
+            // Add debounced search for text inputs
+            let searchTimeout;
+            $('#customer_name, #product_name').on('input', function() {
+                clearTimeout(searchTimeout);
+                const form = $(this).closest('form');
+                
+                searchTimeout = setTimeout(function() {
+                    form.submit();
+                }, 800); // Wait 800ms after user stops typing
+            });
+
+            // Clear search button functionality
+            $('.clear-search').on('click', function(e) {
+                e.preventDefault();
+                $('#customer_name, #product_name, #date_from, #date_to').val('');
+                $('#status').val('');
+                $(this).closest('form').submit();
             });
 
             $('#chat-form').on('submit', function(e) {
@@ -121,7 +252,8 @@
                     method: 'POST',
                     data: {
                         message: message
-                    },                    success: function(response) {
+                    },
+                    success: function(response) {
                         $('#loading').addClass('hidden');
                         if (response.success) {
                             const senderName = response.source === 'n8n_webhook' ? 'n8n AI' : 'AI 助手';
