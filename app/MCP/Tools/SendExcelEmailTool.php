@@ -121,13 +121,11 @@ class SendExcelEmailTool implements ToolInterface
                 'email' => $email,
                 'filters' => $filters,
                 'limit' => $limit
-            ]);
-
-            // Validate email format
+            ]);            // Validate email format
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 throw new JsonRpcErrorException(
-                    JsonRpcErrorCode::INVALID_PARAMS,
-                    '無效的郵箱地址格式'
+                    '無效的郵箱地址格式',
+                    JsonRpcErrorCode::INVALID_PARAMS
                 );
             }
 
@@ -191,16 +189,15 @@ class SendExcelEmailTool implements ToolInterface
             ];
 
         } catch (JsonRpcErrorException $e) {
-            throw $e;
-        } catch (\Exception $e) {
+            throw $e;        } catch (\Exception $e) {
             Log::error('SendExcelEmailTool execution failed:', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
 
             throw new JsonRpcErrorException(
-                JsonRpcErrorCode::INTERNAL_ERROR,
-                '發送郵件失敗：' . $e->getMessage()
+                '發送郵件失敗：' . $e->getMessage(),
+                JsonRpcErrorCode::INTERNAL_ERROR
             );
         }
     }
