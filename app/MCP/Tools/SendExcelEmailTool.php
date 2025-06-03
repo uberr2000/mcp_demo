@@ -57,11 +57,10 @@ class SendExcelEmailTool implements ToolInterface
                 'filters' => [
                     'type' => 'object',
                     'description' => '篩選條件 - Optional field',
-                    'properties' => [
-                        'status' => [
+                    'properties' => [                        'status' => [
                             'type' => 'string',
-                            'enum' => ['pending', 'processing', 'completed', 'cancelled'],
-                            'description' => '訂單狀態篩選（僅適用於訂單導出）'
+                            'enum' => ['pending', 'processing', 'completed', 'cancelled', 'refunded', 'all'],
+                            'description' => '訂單狀態篩選（僅適用於訂單導出）- Use "all" to include all statuses'
                         ],
                         'customer_name' => [
                             'type' => 'string',
@@ -224,11 +223,15 @@ class SendExcelEmailTool implements ToolInterface
 
     private function getOrdersData(array $filters, int $limit): array
     {
-        $query = Order::with('product');
-
-        // Apply filters
+        $query = Order::with('product');        // Apply filters
         if (!empty($filters['status'])) {
-            $query->where('status', $filters['status']);
+            if ($filters['status'] === 'all') {
+                // Don't apply any status filter when "all" is specified
+                Log::info('Status filter set to "all" - no status filtering applied');
+            } else {
+                $query->where('status', $filters['status']);
+                Log::info('Applied status filter: ' . $filters['status']);
+            }
         }
 
         if (!empty($filters['customer_name'])) {

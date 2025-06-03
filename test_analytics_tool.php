@@ -26,3 +26,23 @@ $result3 = $tool->execute([
 ]);
 
 echo json_encode($result3, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+
+echo "\n\n=== Testing with 'all' status ===\n";
+$resultAll = $tool->execute([
+    'analytics_type' => 'status',
+    'status' => 'all',
+    'limit' => 10
+]);
+
+echo "Status analytics with 'all' status:\n";
+echo json_encode($resultAll, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+
+echo "\n\n=== Testing product analytics with 'all' status ===\n";
+$resultProductAll = $tool->execute([
+    'analytics_type' => 'product',
+    'status' => 'all',
+    'limit' => 5
+]);
+
+echo "Product analytics with 'all' status:\n";
+echo json_encode($resultProductAll, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);

@@ -36,10 +36,9 @@ class GetOrdersTool implements ToolInterface
                 'customer_name' => [
                     'type' => 'string',
                     'description' => '客戶姓名（可部分匹配）- Optional field',
-                ],
-                'status' => [
+                ],                'status' => [
                     'type' => 'string',
-                    'description' => '訂單狀態（pending, completed, cancelled）- Optional field',
+                    'description' => '訂單狀態（pending, completed, cancelled, all）- Optional field. Use "all" to include all statuses',
                 ],
                 'product_name' => [
                     'type' => 'string',
@@ -84,7 +83,7 @@ class GetOrdersTool implements ToolInterface
         $validator = Validator::make($arguments, [
             'transaction_id' => ['nullable', 'string'],
             'customer_name' => ['nullable', 'string'],
-            'status' => ['nullable', 'string', 'in:pending,completed,cancelled'],
+            'status' => ['nullable', 'string', 'in:pending,completed,cancelled,all'],
             'product_name' => ['nullable', 'string'],
             'min_amount' => ['nullable', 'numeric', 'min:0'],
             'max_amount' => ['nullable', 'numeric', 'min:0'],
@@ -108,11 +107,14 @@ class GetOrdersTool implements ToolInterface
             }            if (!empty($arguments['customer_name'])) {
                 $query->where('name', 'like', "%{$arguments['customer_name']}%");
                 \Log::info('Added customer_name filter: ' . $arguments['customer_name']);
-            }
-
-            if (!empty($arguments['status'])) {
-                $query->where('status', $arguments['status']);
-                \Log::info('Added status filter: ' . $arguments['status']);
+            }            if (!empty($arguments['status'])) {
+                if ($arguments['status'] === 'all') {
+                    // Don't apply any status filter when "all" is specified
+                    \Log::info('Status filter set to "all" - no status filtering applied');
+                } else {
+                    $query->where('status', $arguments['status']);
+                    \Log::info('Added status filter: ' . $arguments['status']);
+                }
             }
 
             if (!empty($arguments['product_name'])) {

@@ -45,10 +45,9 @@ class GetOrderAnalyticsTool implements ToolInterface
                     'type' => 'string',
                     'format' => 'date',
                     'description' => '分析結束日期 (YYYY-MM-DD) - Optional field',
-                ],
-                'status' => [
+                ],                'status' => [
                     'type' => 'string',
-                    'description' => '篩選特定訂單狀態（pending, completed, cancelled）- Optional field',
+                    'description' => '篩選特定訂單狀態（pending, completed, cancelled, all）- Optional field. Use "all" to include all statuses',
                 ],
                 'limit' => [
                     'type' => 'integer',
@@ -67,12 +66,11 @@ class GetOrderAnalyticsTool implements ToolInterface
     }
 
     public function execute(array $arguments): array
-    {
-        $validator = Validator::make($arguments, [
+    {        $validator = Validator::make($arguments, [
             'analytics_type' => ['nullable', 'string', 'in:daily,status,product,monthly'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
-            'status' => ['nullable', 'string', 'in:pending,completed,cancelled'],
+            'status' => ['nullable', 'string', 'in:pending,completed,cancelled,all'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
@@ -99,8 +97,13 @@ class GetOrderAnalyticsTool implements ToolInterface
                 $baseQuery->whereDate('created_at', '<=', $arguments['date_to']);
                 \Log::info('Applied date_to filter: ' . $arguments['date_to']);
             }            if (isset($arguments['status']) && $arguments['status'] !== '' && $arguments['status'] !== null) {
-                $baseQuery->where('status', $arguments['status']);
-                \Log::info('Applied status filter: ' . $arguments['status']);
+                if ($arguments['status'] === 'all') {
+                    // Don't apply any status filter when "all" is specified
+                    \Log::info('Status filter set to "all" - no status filtering applied');
+                } else {
+                    $baseQuery->where('status', $arguments['status']);
+                    \Log::info('Applied status filter: ' . $arguments['status']);
+                }
             } elseif (isset($arguments['status']) && $arguments['status'] === '') {
                 // Default to 'completed' when status is empty string
                 $baseQuery->where('status', 'completed');
