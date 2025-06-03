@@ -157,11 +157,10 @@ class SendExcelEmailTool implements ToolInterface
 
             // Send email with Excel attachment via SES
             $fullPath = storage_path("app/{$filePath}");
-            
-            Mail::send([], [], function ($mail) use ($email, $emailSubject, $emailMessage, $fullPath, $filename) {
+              Mail::send([], [], function ($mail) use ($email, $emailSubject, $emailMessage, $fullPath, $filename) {
                 $mail->to($email)
                      ->subject($emailSubject)
-                     ->setBody($emailMessage, 'text/plain')
+                     ->text($emailMessage)
                      ->attach($fullPath, [
                          'as' => $filename,
                          'mime' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
