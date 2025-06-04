@@ -44,10 +44,9 @@ class GetProductsTool implements ToolInterface
                 'max_price' => [
                     'type' => 'number',
                     'description' => '最大價格 - Optional field',
-                ],
-                'active' => [
-                    'type' => 'boolean',
-                    'description' => '是否為活躍產品 - Optional field',
+                ],                'stock_quantity' => [
+                    'type' => 'integer',
+                    'description' => '庫存數量篩選 - Optional field',
                 ],
                 'limit' => [
                     'type' => 'integer',
@@ -66,13 +65,12 @@ class GetProductsTool implements ToolInterface
     }
 
     public function execute(array $arguments): array
-    {
-        $validator = Validator::make($arguments, [
+    {        $validator = Validator::make($arguments, [
             'name' => ['nullable', 'string'],
             'category' => ['nullable', 'string'],
             'min_price' => ['nullable', 'numeric', 'min:0'],
             'max_price' => ['nullable', 'numeric', 'min:0'],
-            'active' => ['nullable', 'boolean'],
+            'stock_quantity' => ['nullable', 'integer', 'min:0'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
@@ -96,14 +94,12 @@ class GetProductsTool implements ToolInterface
 
             if (isset($arguments['min_price'])) {
                 $query->where('price', '>=', $arguments['min_price']);
-            }
-
-            if (isset($arguments['max_price'])) {
+            }            if (isset($arguments['max_price'])) {
                 $query->where('price', '<=', $arguments['max_price']);
             }
 
-            if (isset($arguments['active'])) {
-                $query->where('is_active', $arguments['active']);
+            if (isset($arguments['stock_quantity'])) {
+                $query->where('stock_quantity', '>=', $arguments['stock_quantity']);
             }
 
             $limit = $arguments['limit'] ?? 10;
@@ -114,14 +110,13 @@ class GetProductsTool implements ToolInterface
             return [
                 'success' => true,
                 'total' => $products->count(),
-                'products' => $products->map(function ($product) {
-                    return [
+                'products' => $products->map(function ($product) {                    return [
                         'id' => $product->id,
                         'name' => $product->name,
                         'description' => $product->description,
                         'price' => $product->price,
+                        'stock_quantity' => $product->stock_quantity,
                         'category' => $product->category,
-                        'is_active' => $product->is_active,
                         'created_at' => $product->created_at->format('Y-m-d H:i:s'),
                         'updated_at' => $product->updated_at->format('Y-m-d H:i:s'),
                     ];

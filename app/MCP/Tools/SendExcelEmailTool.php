@@ -83,10 +83,9 @@ class SendExcelEmailTool implements ToolInterface
                         'category' => [
                             'type' => 'string',
                             'description' => '產品類別篩選（僅適用於產品導出）'
-                        ],
-                        'active' => [
-                            'type' => 'boolean',
-                            'description' => '是否啟用篩選（僅適用於產品導出）'
+                        ],                        'stock_quantity' => [
+                            'type' => 'integer',
+                            'description' => '庫存數量篩選（僅適用於產品導出）'
                         ]
                     ]
                 ],
@@ -269,10 +268,8 @@ class SendExcelEmailTool implements ToolInterface
 
         if (!empty($filters['category'])) {
             $query->where('category', 'like', '%' . $filters['category'] . '%');
-        }
-
-        if (isset($filters['active'])) {
-            $query->where('active', $filters['active']);
+        }        if (isset($filters['stock_quantity'])) {
+            $query->where('stock_quantity', '>=', $filters['stock_quantity']);
         }
 
         if (!empty($filters['date_from'])) {
