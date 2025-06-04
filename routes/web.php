@@ -12,6 +12,11 @@ Route::get('/mcp-test', function () {
     return view('mcp-test');
 })->name('mcp.test');
 
+// SSE Connection Test Page
+Route::get('/sse-test', function () {
+    return view('sse-test');
+})->name('sse.test');
+
 // MCP Service Routes
 Route::prefix('mcp')->withoutMiddleware(['web'])->group(function () {
     Route::post('/initialize', [MCPController::class, 'initialize'])->name('mcp.initialize');
