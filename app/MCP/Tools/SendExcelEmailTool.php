@@ -39,7 +39,7 @@ class SendExcelEmailTool implements ToolInterface
                 'type' => [
                     'type' => 'string',
                     'enum' => ['orders', 'products'],
-                    'description' => '要導出的數據類型：orders(訂單) 或 products(產品)'
+                    'description' => '要導出的數據類型：orders(訂單) 或 products(產品) - Required field'
                 ],
                 'email' => [
                     'type' => 'string',

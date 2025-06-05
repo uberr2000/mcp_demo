@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from flask import Flask, Response, request, jsonify
+from flask import Flask, Response, request, jsonify, make_response
 from flask_cors import CORS
 import json
 import asyncio
@@ -17,7 +17,26 @@ LARAVEL_MCP_URL = os.getenv("LARAVEL_MCP_URL", "http://localhost:8000/mcp")
 MCP_SERVER_PORT = int(os.getenv("MCP_SERVER_PORT", "8080"))
 
 app = Flask(__name__)
-CORS(app)  # 启用 CORS 支持
+# 配置 CORS
+CORS(
+    app,
+    resources={
+        r"/*": {
+            "origins": ["*", "http://localhost:*", "http://127.0.0.1:*"],
+            "methods": ["GET", "POST", "OPTIONS"],
+            "allow_headers": [
+                "*",
+                "Content-Type",
+                "Authorization",
+                "X-Requested-With",
+                "Accept",
+            ],
+            "expose_headers": ["*", "Content-Type", "Authorization"],
+            "supports_credentials": True,
+            "max_age": 3600,
+        }
+    },
+)
 
 # 缓存工具定义
 TOOLS_CACHE = None
@@ -97,26 +116,51 @@ TOOL_FUNCTIONS = {
 
 
 def format_sse(data: str, event: str = None) -> str:
-    """格式化SSE消息"""
-    msg = f"data: {data}\n\n"
+    """格式化SSE消息，确保符合MCP Inspector要求"""
+    if isinstance(data, dict):
+        data = json.dumps(data, ensure_ascii=False)
+    msg = f"data: {data}\n"
     if event is not None:
         msg = f"event: {event}\n{msg}"
+    msg += "\n"  # 确保每条消息后有两个换行符
     return msg
 
 
 @app.route("/", methods=["GET"])
 def index():
     """健康检查端点"""
-    return jsonify({"status": "ok", "message": "MCP Server is running"})
+    return jsonify(
+        {
+            "status": "ok",
+            "message": "MCP Server is running",
+            "version": "1.0.0",
+            "endpoints": {
+                "sse": f"http://localhost:{MCP_SERVER_PORT}/sse",
+                "mcp_sse": f"http://localhost:{MCP_SERVER_PORT}/mcp/sse",
+            },
+        }
+    )
 
 
-@app.route("/sse", methods=["GET", "POST"])
-@app.route("/mcp/sse", methods=["GET", "POST"])  # 添加备用路径
+@app.route("/sse", methods=["GET", "POST", "OPTIONS"])
+@app.route("/mcp/sse", methods=["GET", "POST", "OPTIONS"])
 def sse():
+    """SSE 端点，支持 MCP Inspector"""
     print("\n=== SSE 连接建立 ===")
     print(f"请求路径: {request.path}")
     print(f"请求方法: {request.method}")
     print(f"请求头: {dict(request.headers)}")
+    print(f"来源: {request.origin}")
+
+    # 处理 OPTIONS 请求
+    if request.method == "OPTIONS":
+        response = make_response()
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        response.headers.add("Access-Control-Allow-Headers", "*")
+        response.headers.add("Access-Control-Max-Age", "3600")
+        return response
+
     if request.method == "POST":
         print("收到 POST 请求")
         try:
@@ -141,6 +185,12 @@ def sse():
     def event_stream():
         print("\n=== 开始事件流 ===")
         try:
+            # 发送初始连接成功消息
+            yield format_sse(
+                {"status": "connected", "timestamp": datetime.now().isoformat()},
+                "connected",
+            )
+
             # 获取工具列表
             tools = get_tools_from_laravel()
             print(
@@ -148,26 +198,53 @@ def sse():
             )
 
             # 发送工具列表
-            tools_event = (
-                f"event: tools\ndata: {json.dumps(tools, ensure_ascii=False)}\n\n"
-            )
+            tools_event = format_sse(tools, "tools")
             print(f"发送工具列表事件: {tools_event}")
             yield tools_event
 
             # 保持连接活跃
             while True:
                 print("发送心跳...")
-                yield f"event: heartbeat\ndata: {json.dumps({'timestamp': datetime.now().isoformat()}, ensure_ascii=False)}\n\n"
+                heartbeat = format_sse(
+                    {
+                        "type": "heartbeat",
+                        "timestamp": datetime.now().isoformat(),
+                        "status": "alive",
+                    },
+                    "heartbeat",
+                )
+                yield heartbeat
                 time.sleep(30)
         except Exception as e:
             print(f"事件流处理时发生错误: {str(e)}")
-            error_event = f"event: error\ndata: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
+            error_event = format_sse(
+                {
+                    "type": "error",
+                    "message": str(e),
+                    "timestamp": datetime.now().isoformat(),
+                },
+                "error",
+            )
             print(f"发送错误事件: {error_event}")
             yield error_event
 
-    return Response(event_stream(), mimetype="text/event-stream")
+    response = Response(
+        event_stream(),
+        mimetype="text/event-stream",
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+            "Content-Type": "text/event-stream; charset=utf-8",
+        },
+    )
+    return response
 
 
 if __name__ == "__main__":
     print(f"启动 MCP 服务器在端口 {MCP_SERVER_PORT}...")
+    print(f"SSE 端点: http://localhost:{MCP_SERVER_PORT}/sse")
+    print(f"备用 SSE 端点: http://localhost:{MCP_SERVER_PORT}/mcp/sse")
+    print("支持 MCP Inspector 连接")
     app.run(host="0.0.0.0", port=MCP_SERVER_PORT, debug=True)
