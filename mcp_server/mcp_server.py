@@ -14,6 +14,7 @@ load_dotenv()
 
 # Laravel MCP服务器配置
 LARAVEL_MCP_URL = os.getenv("LARAVEL_MCP_URL", "http://localhost:8000/mcp")
+MCP_SERVER_PORT = int(os.getenv("MCP_SERVER_PORT", "8080"))
 
 app = Flask(__name__)
 CORS(app)  # 启用 CORS 支持
@@ -168,4 +169,5 @@ def sse():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080, debug=True)
+    print(f"启动 MCP 服务器在端口 {MCP_SERVER_PORT}...")
+    app.run(host="0.0.0.0", port=MCP_SERVER_PORT, debug=True)

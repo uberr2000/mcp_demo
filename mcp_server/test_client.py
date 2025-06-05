@@ -4,13 +4,21 @@ import json
 import sseclient
 import time
 from datetime import datetime, timedelta
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# MCP 服务器配置
+MCP_SERVER_PORT = int(os.getenv("MCP_SERVER_PORT", "8080"))
+MCP_SERVER_URL = f"http://127.0.0.1:{MCP_SERVER_PORT}"
 
 
 def connect_to_sse():
     """连接到SSE服务器并获取工具列表"""
     print("\n=== 开始连接 SSE 服务器 ===")
     try:
-        response = requests.get("http://127.0.0.1:8080/sse", stream=True)
+        response = requests.get(f"{MCP_SERVER_URL}/sse", stream=True)
         response.raise_for_status()
         print("成功连接到 SSE 服务器")
 
@@ -62,7 +70,7 @@ def test_tool(tool_name, params=None):
 
     try:
         response = requests.post(
-            "http://127.0.0.1:8080/sse",
+            f"{MCP_SERVER_URL}/sse",
             json={"tool": tool_name, "params": params or {}},
         )
         response.raise_for_status()
