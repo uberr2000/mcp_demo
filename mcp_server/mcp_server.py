@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from flask import Flask, Response, request, jsonify
+from flask_cors import CORS
 import json
 import asyncio
 from typing import Dict, Any, List
@@ -15,6 +16,7 @@ load_dotenv()
 LARAVEL_MCP_URL = os.getenv("LARAVEL_MCP_URL", "http://localhost:8000/mcp")
 
 app = Flask(__name__)
+CORS(app)  # 启用 CORS 支持
 
 # 缓存工具定义
 TOOLS_CACHE = None
@@ -101,9 +103,19 @@ def format_sse(data: str, event: str = None) -> str:
     return msg
 
 
+@app.route("/", methods=["GET"])
+def index():
+    """健康检查端点"""
+    return jsonify({"status": "ok", "message": "MCP Server is running"})
+
+
 @app.route("/sse", methods=["GET", "POST"])
+@app.route("/mcp/sse", methods=["GET", "POST"])  # 添加备用路径
 def sse():
     print("\n=== SSE 连接建立 ===")
+    print(f"请求路径: {request.path}")
+    print(f"请求方法: {request.method}")
+    print(f"请求头: {dict(request.headers)}")
     if request.method == "POST":
         print("收到 POST 请求")
         try:
