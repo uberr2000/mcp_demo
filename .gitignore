@@ -24,6 +24,7 @@ Homestead.yaml
 npm-debug.log
 Thumbs.db
 yarn-error.log
+node_modules
 
 **/caddy
 frankenphp

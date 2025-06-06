@@ -124,10 +124,10 @@ class SendExcelEmailTool implements ToolInterface
                 throw new JsonRpcErrorException(
                     '無效的郵箱地址格式',
                     JsonRpcErrorCode::INVALID_PARAMS
-                );
-            }            // Generate filename with timestamp
+                );            }            // Generate unique filename with timestamp and unique ID
             $timestamp = now()->format('Y-m-d_H-i-s');
-            $filename = "{$type}_export_{$timestamp}.xlsx";
+            $uniqueId = uniqid('', true); // Generate unique ID with more entropy
+            $filename = "{$type}_export_{$timestamp}_{$uniqueId}.xlsx";
             $filePath = "exports/{$filename}";
 
             // Ensure the exports directory exists

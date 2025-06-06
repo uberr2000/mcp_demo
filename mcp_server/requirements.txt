@@ -1,7 +1,0 @@
-flask==3.0.2
-python-dotenv==1.0.1
-mysql-connector-python==8.3.0
-sqlalchemy==2.0.27
-requests==2.31.0
-sseclient-py==1.7.2
-flask-cors==4.0.0
