@@ -1,5 +1,6 @@
 import { BaseTool } from "./BaseTool.js";
 import Joi from "joi";
+import db from "../database.js";
 
 export class GetProductsTool extends BaseTool {
     get name() {
@@ -67,54 +68,66 @@ export class GetProductsTool extends BaseTool {
         try {
             this.validateInput(params);
 
-            // 构建查询条件
-            const query = {};
+            // 構建SQL查詢
+            let sql = "SELECT id, name, description, price, stock_quantity, category, created_at, updated_at FROM products WHERE 1=1";
+            
+            const queryParams = [];
 
+            // 添加查詢條件
             if (params.name) {
-                query.name = { $regex: params.name, $options: "i" };
+                sql += ' AND name LIKE ?';
+                queryParams.push(`%${params.name}%`);
             }
 
             if (params.category) {
-                query.category = { $regex: params.category, $options: "i" };
+                sql += ' AND category LIKE ?';
+                queryParams.push(`%${params.category}%`);
             }
 
             if (params.min_price !== undefined) {
-                query.price = { $gte: params.min_price };
+                sql += ' AND price >= ?';
+                queryParams.push(params.min_price);
             }
 
             if (params.max_price !== undefined) {
-                query.price = { ...query.price, $lte: params.max_price };
+                sql += ' AND price <= ?';
+                queryParams.push(params.max_price);
             }
 
             if (params.stock_quantity !== undefined) {
-                query.stock_quantity = { $gte: params.stock_quantity };
+                sql += ' AND stock_quantity >= ?';
+                queryParams.push(params.stock_quantity);
             }
 
-            const limit = params.limit || 10;
+            // 添加排序和限制
+            sql += ' ORDER BY name ASC';
+            
+            const limit = parseInt(params.limit || 10);
+            sql += ' LIMIT ?';
+            queryParams.push(limit);
 
-            // 这里需要替换为实际的数据库查询
-            // const products = await Product.find(query)
-            //     .sort({ name: 1 })
-            //     .limit(limit);
+            console.log('Executing SQL:', sql);
+            console.log('With params:', queryParams);
 
-            // 模拟返回数据
-            const products = [];
+            // 執行查詢
+            const products = await db.query(sql, queryParams);
 
             return {
                 success: true,
                 total: products.length,
                 products: products.map((product) => ({
-                    id: product._id,
+                    id: product.id,
                     name: product.name,
                     description: product.description,
                     price: product.price,
                     stock_quantity: product.stock_quantity,
                     category: product.category,
-                    created_at: product.created_at.toISOString(),
-                    updated_at: product.updated_at.toISOString(),
+                    created_at: product.created_at,
+                    updated_at: product.updated_at,
                 })),
             };
         } catch (error) {
+            console.error('GetProductsTool execution error:', error);
             throw new Error(`Failed to retrieve products: ${error.message}`);
         }
     }

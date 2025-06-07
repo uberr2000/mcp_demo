@@ -1,5 +1,6 @@
 import { BaseTool } from "./BaseTool.js";
 import Joi from "joi";
+import db from "../database.js";
 
 export class GetOrdersTool extends BaseTool {
     get name() {
@@ -101,88 +102,94 @@ export class GetOrdersTool extends BaseTool {
         try {
             this.validateInput(params);
 
-            // 构建查询条件
-            const query = {};
+            // 構建SQL查詢
+            let sql = "SELECT o.id, o.transaction_id, o.name, o.quantity, o.amount, o.status, o.created_at, o.updated_at, p.id as product_id, p.name as product_name, p.price as product_price FROM orders o LEFT JOIN products p ON o.product_id = p.id WHERE 1=1";
+            
+            const queryParams = [];
 
+            // 添加查詢條件
             if (params.transaction_id) {
-                query.transaction_id = params.transaction_id;
+                sql += ' AND o.transaction_id = ?';
+                queryParams.push(params.transaction_id);
             }
 
             if (params.customer_name) {
-                query.name = { $regex: params.customer_name, $options: "i" };
+                sql += ' AND o.name LIKE ?';
+                queryParams.push(`%${params.customer_name}%`);
             }
 
             if (params.status) {
-                query.status = params.status;
+                sql += ' AND o.status = ?';
+                queryParams.push(params.status);
             }
 
             if (params.product_name) {
-                query["product.name"] = {
-                    $regex: params.product_name,
-                    $options: "i",
-                };
+                sql += ' AND p.name LIKE ?';
+                queryParams.push(`%${params.product_name}%`);
             }
 
             if (params.min_amount !== undefined) {
-                query.amount = { $gte: params.min_amount };
+                sql += ' AND o.amount >= ?';
+                queryParams.push(params.min_amount);
             }
 
             if (params.max_amount !== undefined) {
-                query.amount = { ...query.amount, $lte: params.max_amount };
+                sql += ' AND o.amount <= ?';
+                queryParams.push(params.max_amount);
             }
 
             if (params.date_from) {
-                query.created_at = { $gte: new Date(params.date_from) };
+                sql += ' AND o.created_at >= ?';
+                queryParams.push(params.date_from);
             }
 
             if (params.date_to) {
-                query.created_at = {
-                    ...query.created_at,
-                    $lte: new Date(params.date_to),
-                };
+                sql += ' AND o.created_at <= ?';
+                queryParams.push(params.date_to + ' 23:59:59');
             }
 
-            // 如果没有指定日期范围，默认查询最近30天
+            // 如果沒有指定日期範圍，默認查詢最近30天
             if (!params.date_from && !params.date_to) {
                 const thirtyDaysAgo = new Date();
                 thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-                query.created_at = { $gte: thirtyDaysAgo };
+                sql += ' AND o.created_at >= ?';
+                queryParams.push(thirtyDaysAgo.toISOString().split('T')[0]);
             }
 
-            const limit = params.limit || 10;
+            // 添加排序和限制
+            sql += ' ORDER BY o.created_at DESC';
+            
+            const limit = parseInt(params.limit || 10);
+            sql += ' LIMIT ?';
+            queryParams.push(limit);
 
-            // 这里需要替换为实际的数据库查询
-            // const orders = await Order.find(query)
-            //     .populate('product')
-            //     .sort({ created_at: -1 })
-            //     .limit(limit);
+            console.log('Executing SQL:', sql);
+            console.log('With params:', queryParams);
 
-            // 模拟返回数据
-            const orders = [];
+            // 執行查詢
+            const orders = await db.query(sql, queryParams);
 
             return {
                 success: true,
                 total: orders.length,
                 orders: orders.map((order) => ({
-                    id: order._id,
+                    id: order.id,
                     transaction_id: order.transaction_id,
                     name: order.name,
-                    email: order.email,
-                    phone: order.phone,
-                    address: order.address,
                     product: {
-                        id: order.product?._id,
-                        name: order.product?.name,
-                        price: order.product?.price,
+                        id: order.product_id,
+                        name: order.product_name,
+                        price: order.product_price,
                     },
                     quantity: order.quantity,
                     amount: order.amount,
                     status: order.status,
-                    created_at: order.created_at.toISOString(),
-                    updated_at: order.updated_at.toISOString(),
+                    created_at: order.created_at,
+                    updated_at: order.updated_at,
                 })),
             };
         } catch (error) {
+            console.error('GetOrdersTool execution error:', error);
             throw new Error(`Failed to retrieve orders: ${error.message}`);
         }
     }

@@ -270,7 +270,7 @@ app.get("/health", (req, res) => {
 });
 
 // Start the server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.MCP_SERVER_PORT || 3000;
 app.listen(PORT, () => {
     console.log(`MCP Server listening on port ${PORT}`);
     console.log(`SSE endpoint: http://localhost:${PORT}/sse`);
