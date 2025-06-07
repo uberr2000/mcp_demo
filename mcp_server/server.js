@@ -1,6 +1,10 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import express from "express";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { 
+    ListToolsRequestSchema, 
+    CallToolRequestSchema 
+} from "@modelcontextprotocol/sdk/types.js";
+import express from "express";
 import { GetOrdersTool } from "./tools/GetOrdersTool.js";
 import { GetCustomerStatsTool } from "./tools/GetCustomerStatsTool.js";
 import { GetOrderAnalyticsTool } from "./tools/GetOrderAnalyticsTool.js";
@@ -22,7 +26,7 @@ const toolsList = [
     {
         name: "get_orders",
         description: "獲取訂單信息",
-        input_schema: {
+        inputSchema: {
             type: "object",
             properties: {
                 transaction_id: { type: "string", description: "交易ID" },
@@ -52,7 +56,7 @@ const toolsList = [
     {
         name: "get_customer_stats",
         description: "獲取客戶統計信息",
-        input_schema: {
+        inputSchema: {
             type: "object",
             properties: {
                 customer_name: { type: "string", description: "客戶名稱" },
@@ -78,7 +82,7 @@ const toolsList = [
     {
         name: "get_order_analytics",
         description: "獲取訂單分析數據",
-        input_schema: {
+        inputSchema: {
             type: "object",
             properties: {
                 analytics_type: {
@@ -108,7 +112,7 @@ const toolsList = [
     {
         name: "get_products",
         description: "獲取產品信息",
-        input_schema: {
+        inputSchema: {
             type: "object",
             properties: {
                 name: { type: "string", description: "產品名稱" },
@@ -123,7 +127,7 @@ const toolsList = [
     {
         name: "send_excel_email",
         description: "發送Excel郵件",
-        input_schema: {
+        inputSchema: {
             type: "object",
             properties: {
                 type: {
@@ -146,6 +150,15 @@ const toolsList = [
     },
 ];
 
+// Define tool instances
+const toolInstances = {
+    get_orders: new GetOrdersTool(),
+    get_customer_stats: new GetCustomerStatsTool(),
+    get_order_analytics: new GetOrderAnalyticsTool(),
+    get_products: new GetProductsTool(),
+    send_excel_email: new SendExcelEmailTool(),
+};
+
 // Create server instance
 const server = new Server(
     {
@@ -159,154 +172,108 @@ const server = new Server(
     }
 );
 
-// Define tool instances
-const toolInstances = {
-    get_orders: new GetOrdersTool(),
-    get_customer_stats: new GetCustomerStatsTool(),
-    get_order_analytics: new GetOrderAnalyticsTool(),
-    get_products: new GetProductsTool(),
-    send_excel_email: new SendExcelEmailTool(),
-};
+// Register tools using proper MCP SDK schemas
+server.setRequestHandler(ListToolsRequestSchema, async () => {
+    console.log("ListToolsRequestSchema handler called");
+    return { tools: toolsList };
+});
 
-// Handle request events
-server.onRequest = async (request) => {
-    console.log("Request received:", request.method);
+server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+    console.log("CallToolRequestSchema handler called:", request);
+    const { name, arguments: args } = request.params;
     
-    if (request.method === "tools/list") {
-        console.log("tools/list request received");
-        return { tools: toolsList };
+    const tool = toolInstances[name];
+    if (!tool) {
+        throw new Error(`Tool "${name}" not found`);
     }
     
-    if (request.method === "tools/call") {
-        console.log("tools/call request received:", request);
-        const { name, arguments: args } = request.params;
-        
-        const tool = toolInstances[name];
-        if (!tool) {
-            throw new Error(`Tool "${name}" not found`);
-        }
-        
-        try {
-            const result = await tool.execute(args || {});
-            return {
-                content: [
-                    {
-                        type: "text", 
-                        text: JSON.stringify(result, null, 2)
-                    }
-                ]
-            };
-        } catch (error) {
-            console.error(`Error executing tool ${name}:`, error);
-            throw new Error(`Tool execution failed: ${error.message}`);
-        }
+    try {
+        const result = await tool.execute(args || {});
+        return {
+            content: [
+                {
+                    type: "text", 
+                    text: JSON.stringify(result, null, 2)
+                }
+            ]
+        };
+    } catch (error) {
+        console.error(`Error executing tool ${name}:`, error);
+        throw new Error(`Tool execution failed: ${error.message}`);
     }
-    
-    throw new Error(`Unknown method: ${request.method}`);
-};
+});
 
-// to support multiple simultaneous connections we have a lookup object from
-// sessionId to transport
-const transports = {};
+// Transport lookup for session management
+const transports = new Map();
 
+// Express app setup
 const app = express();
 app.use(express.json());
 
-const router = express.Router();
-
-// endpoint for the client to use for sending messages
-const POST_ENDPOINT = "/messages";
-
-router.post(POST_ENDPOINT, async (req, res) => {
-    console.log("message request received: ", req.body);
-    // when client sends messages with `SSEClientTransport`,
-    // the sessionId will be atomically set as query parameter.
-    const sessionId = req.query.sessionId;
-
-    if (typeof sessionId != "string") {
-        res.status(400).send({ messages: "Bad session id." });
-        return;
-    }
-    const transport = transports[sessionId];
-    if (!transport) {
-        res.status(400).send({ messages: "No transport found for sessionId." });
-        return;
-    }
-
-    await transport.handlePostMessage(req, res, req.body);
-    return;
-});
-
-// initialization:
-// create a new transport to connect and
-// send an endpoint event containing a URI for the client to use for sending messages
-router.get("/connect", async (req, res) => {
-    console.log("connection request received");
-    // tells the client to send messages to the `POST_ENDPOINT`
-    const transport = new SSEServerTransport(POST_ENDPOINT, res);
-    console.log("new transport created with session id: ", transport.sessionId);
-
-    transports[transport.sessionId] = transport;
-
-    res.on("close", () => {
-        console.log("SSE connection closed");
-        delete transports[transport.sessionId];
+// SSE endpoint for client connections
+app.get("/sse", async (req, res) => {
+    console.log("SSE connection request received");
+    
+    // Create SSE transport - let it handle the headers
+    const transport = new SSEServerTransport("/message", res);
+    console.log("New SSE transport created with session ID:", transport.sessionId);
+    
+    // Store transport
+    transports.set(transport.sessionId, transport);
+    
+    // Handle connection close
+    res.on('close', () => {
+        console.log("SSE connection closed for session:", transport.sessionId);
+        transports.delete(transport.sessionId);
     });
-
-    await server.connect(transport);
-
-    // an example of a server-sent-event (message) to client
-    await sendMessages(transport);
-
-    return;
+    
+    // Connect server to transport
+    try {
+        await server.connect(transport);
+        console.log("Server connected to SSE transport successfully");
+    } catch (error) {
+        console.error("Error connecting server to SSE transport:", error);
+        if (!res.headersSent) {
+            res.status(500).json({ error: "Failed to establish SSE connection" });
+        }
+    }
 });
 
-async function sendMessages(transport) {
-    try {
-        await transport.send({
-            jsonrpc: "2.0",
-            method: "sse/connection",
-            params: { message: "Stream started" },
-        });
-        console.log("Stream started");
-
-        let messageCount = 0;
-        const interval = setInterval(async () => {
-            messageCount++;
-
-            const message = `Message ${messageCount} at ${new Date().toISOString()}`;
-
-            try {
-                await transport.send({
-                    jsonrpc: "2.0",
-                    method: "sse/message",
-                    params: { data: message },
-                });
-
-                console.log(`Sent: ${message}`);
-
-                if (messageCount === 2) {
-                    clearInterval(interval);
-                    await transport.send({
-                        jsonrpc: "2.0",
-                        method: "sse/complete",
-                        params: { message: "Stream completed" },
-                    });
-                    console.log("Stream completed");
-                }
-            } catch (error) {
-                console.error("Error sending message:", error);
-                clearInterval(interval);
-            }
-        }, 1000);
-    } catch (error) {
-        console.error("Error in startSending:", error);
+// Message endpoint for client requests
+app.post("/message", async (req, res) => {
+    console.log("Message request received:", req.body);
+    
+    const sessionId = req.query.sessionId;
+    if (!sessionId) {
+        return res.status(400).json({ error: "Missing sessionId" });
     }
-}
+    
+    const transport = transports.get(sessionId);
+    if (!transport) {
+        return res.status(400).json({ error: "Transport not found for sessionId" });
+    }
+    
+    try {
+        // Let the transport handle the message properly with the server
+        await transport.handlePostMessage(req, res, req.body);
+    } catch (error) {
+        console.error("Error handling post message:", error);
+        if (!res.headersSent) {
+            res.status(500).json({ error: "Internal server error" });
+        }
+    }
+});
 
-app.use("/", router);
+// Health check endpoint
+app.get("/health", (req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
 
-const PORT = 3000;
+// Start the server
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`MCP Streamable HTTP Server listening on port ${PORT}`);
+    console.log(`MCP Server listening on port ${PORT}`);
+    console.log(`SSE endpoint: http://localhost:${PORT}/sse`);
+    console.log(`Message endpoint: http://localhost:${PORT}/message`);
+    console.log(`Health check: http://localhost:${PORT}/health`);
 });
