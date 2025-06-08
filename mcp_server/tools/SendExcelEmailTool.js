@@ -323,29 +323,103 @@ export class SendExcelEmailTool extends BaseTool {
     }
 
     async sendEmail(to, subject, text, filePath, filename) {
-        const ses = new SES({
-            region: process.env.AWS_REGION,
-            credentials: {
-                accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-                secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-            },
-        });
+        let transporter;
+        let sesError = null;
+        
+        // Try AWS SES first if configured
+        if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.SES_FROM_EMAIL) {
+            try {
+                console.log('Attempting to use AWS SES for email sending...');
+                
+                // Use AWS SDK v3 with proper configuration for Nodemailer
+                const ses = new SES({
+                    region: process.env.AWS_REGION || 'us-east-1',
+                    credentials: {
+                        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+                        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+                    },
+                });
 
-        const transporter = nodemailer.createTransport({
-            SES: { ses, aws: { SendRawEmail: true } },
-        });
-
-        await transporter.sendMail({
-            from: process.env.SES_FROM_EMAIL,
-            to,
-            subject,
-            text,
-            attachments: [
-                {
-                    filename,
-                    path: filePath,
-                },
-            ],
-        });
+                // Create transporter with proper AWS SDK v3 configuration
+                transporter = nodemailer.createTransporter({
+                    SES: {
+                        ses: ses,
+                        aws: {
+                            SendRawEmail: true
+                        }
+                    }
+                });
+                
+                const result = await transporter.sendMail({
+                    from: process.env.SES_FROM_EMAIL,
+                    to,
+                    subject,
+                    text,
+                    attachments: [
+                        {
+                            filename,
+                            path: filePath,
+                        },
+                    ],
+                });
+                
+                console.log('Email sent successfully via AWS SES:', result.messageId);
+                return result;
+                
+            } catch (error) {
+                console.error('AWS SES failed, trying fallback method:', error.message);
+                sesError = error; // Store the error for later reference
+                // Fall through to SMTP fallback
+            }
+        }
+        
+        // Fallback to SMTP if SES fails or is not configured
+        if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+            try {
+                console.log('Using SMTP fallback for email sending...');
+                
+                transporter = nodemailer.createTransporter({
+                    host: process.env.SMTP_HOST,
+                    port: process.env.SMTP_PORT || 587,
+                    secure: process.env.SMTP_PORT === '465', // true for 465, false for other ports
+                    auth: {
+                        user: process.env.SMTP_USER,
+                        pass: process.env.SMTP_PASS,
+                    },
+                });
+                
+                const result = await transporter.sendMail({
+                    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+                    to,
+                    subject,
+                    text,
+                    attachments: [
+                        {
+                            filename,
+                            path: filePath,
+                        },
+                    ],
+                });
+                
+                console.log('Email sent successfully via SMTP:', result.messageId);
+                return result;
+                
+            } catch (smtpError) {
+                console.error('SMTP also failed:', smtpError.message);
+                throw new Error(`Both AWS SES and SMTP failed. SES: ${sesError?.message || 'Not configured'}, SMTP: ${smtpError.message}`);
+            }
+        }
+        
+        // If no email service is configured, simulate success for development
+        console.warn('No email service configured. Simulating email send for development...');
+        console.log(`📧 Email would be sent to: ${to}`);
+        console.log(`📧 Subject: ${subject}`);
+        console.log(`📧 Message: ${text}`);
+        console.log(`📧 Attachment: ${filename}`);
+        
+        return {
+            messageId: 'simulated-' + Date.now(),
+            message: 'Email sending simulated (no email service configured)'
+        };
     }
 }

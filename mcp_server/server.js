@@ -111,7 +111,7 @@ const toolsList = [
     },
     {
         name: "get_products",
-        description: "獲取產品信息",
+        description: "從資料庫獲取產品資訊，可以根據產品名稱、類別、價格範圍進行查詢",
         inputSchema: {
             type: "object",
             properties: {
@@ -119,7 +119,7 @@ const toolsList = [
                 category: { type: "string", description: "產品類別" },
                 min_price: { type: "number", description: "最低價格" },
                 max_price: { type: "number", description: "最高價格" },
-                stock: { type: "integer", description: "庫存數量" },
+                stock_quantity: { type: "integer", description: "庫存數量" },
                 limit: { type: "integer", description: "返回結果數量限制" },
             },
         },
