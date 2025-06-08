@@ -2,7 +2,7 @@ import { BaseTool } from "./BaseTool.js";
 import Joi from "joi";
 import ExcelJS from "exceljs";
 import nodemailer from "nodemailer";
-import { SES } from "@aws-sdk/client-ses";
+import AWS from "aws-sdk";
 import fs from "fs/promises";
 import path from "path";
 
@@ -331,23 +331,16 @@ export class SendExcelEmailTool extends BaseTool {
             try {
                 console.log('Attempting to use AWS SES for email sending...');
                 
-                // Use AWS SDK v3 with proper configuration for Nodemailer
-                const ses = new SES({
+                // Use AWS SDK v2 for compatibility with Nodemailer
+                const ses = new AWS.SES({
                     region: process.env.AWS_REGION || 'us-east-1',
-                    credentials: {
-                        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-                        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-                    },
+                    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+                    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
                 });
 
-                // Create transporter with proper AWS SDK v3 configuration
-                transporter = nodemailer.createTransporter({
-                    SES: {
-                        ses: ses,
-                        aws: {
-                            SendRawEmail: true
-                        }
-                    }
+                // Create transporter with AWS SDK v2
+                transporter = nodemailer.createTransport({
+                    SES: { ses, aws: AWS }
                 });
                 
                 const result = await transporter.sendMail({
@@ -378,7 +371,7 @@ export class SendExcelEmailTool extends BaseTool {
             try {
                 console.log('Using SMTP fallback for email sending...');
                 
-                transporter = nodemailer.createTransporter({
+                transporter = nodemailer.createTransport({
                     host: process.env.SMTP_HOST,
                     port: process.env.SMTP_PORT || 587,
                     secure: process.env.SMTP_PORT === '465', // true for 465, false for other ports
