@@ -269,6 +269,62 @@ app.get("/health", (req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+// Tools list endpoint for n8n compatibility (JSON-RPC)
+app.post("/tools/list", async (req, res) => {
+    console.log("Tools list request received:", req.body);
+    
+    try {
+        // Validate JSON-RPC format
+        const { method, params, jsonrpc, id } = req.body;
+        
+        if (jsonrpc !== "2.0") {
+            return res.status(400).json({
+                jsonrpc: "2.0",
+                error: {
+                    code: -32600,
+                    message: "Invalid Request - jsonrpc must be '2.0'"
+                },
+                id: id || null
+            });
+        }
+        
+        if (method !== "tools/list") {
+            return res.status(400).json({
+                jsonrpc: "2.0",
+                error: {
+                    code: -32601,
+                    message: `Method not found: ${method}`
+                },
+                id: id || null
+            });
+        }
+        
+        // Return tools list in JSON-RPC format
+        const response = {
+            jsonrpc: "2.0",
+            result: {
+                tools: toolsList
+            },
+            id: id || null
+        };
+        
+        console.log("Returning tools list:", response);
+        res.json(response);
+        
+    } catch (error) {
+        console.error("Error processing tools/list request:", error);
+        res.status(500).json({
+            jsonrpc: "2.0",
+            error: {
+                code: -32603,
+                message: "Internal error",
+                data: error.message
+            },
+            id: req.body?.id || null
+        });
+    }
+});
+
 // Start the server
 const PORT = process.env.MCP_SERVER_PORT || 3000;
 app.listen(PORT, () => {
