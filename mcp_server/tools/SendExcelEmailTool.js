@@ -5,6 +5,7 @@ import nodemailer from "nodemailer";
 import AWS from "aws-sdk";
 import fs from "fs/promises";
 import path from "path";
+import db from "../database.js";
 
 export class SendExcelEmailTool extends BaseTool {
     get name() {
@@ -205,66 +206,93 @@ export class SendExcelEmailTool extends BaseTool {
     }
 
     async getOrdersData(filters, limit) {
-        const query = {};
+        // 構建SQL查詢
+        let sql = `
+            SELECT 
+                o.id,
+                o.transaction_id,
+                o.name as customer_name,
+                p.name as product_name,
+                o.quantity,
+                o.amount as price,
+                o.status,
+                o.created_at,
+                o.updated_at
+            FROM orders o
+            LEFT JOIN products p ON o.product_id = p.id
+            WHERE 1=1
+        `;
+        const queryParams = [];
 
+        // 添加篩選條件
         if (filters.status && filters.status !== "all") {
-            query.status = filters.status;
+            sql += ' AND o.status = ?';
+            queryParams.push(filters.status);
         }
 
         if (filters.customer_name) {
-            query.name = { $regex: filters.customer_name, $options: "i" };
+            sql += ' AND o.name LIKE ?';
+            queryParams.push(`%${filters.customer_name}%`);
         }
 
         if (filters.product_name) {
-            query["product.name"] = {
-                $regex: filters.product_name,
-                $options: "i",
-            };
+            sql += ' AND p.name LIKE ?';
+            queryParams.push(`%${filters.product_name}%`);
         }
 
         if (filters.date_from) {
-            query.created_at = { $gte: new Date(filters.date_from) };
+            sql += ' AND o.created_at >= ?';
+            queryParams.push(filters.date_from);
         }
 
         if (filters.date_to) {
-            query.created_at = {
-                ...query.created_at,
-                $lte: new Date(filters.date_to),
-            };
+            sql += ' AND o.created_at <= ?';
+            queryParams.push(filters.date_to + ' 23:59:59');
         }
 
-        // 这里需要替换为实际的数据库查询
-        // const orders = await Order.find(query)
-        //     .populate('product')
-        //     .sort({ created_at: -1 })
-        //     .limit(limit);
+        // 添加排序和限制
+        sql += ' ORDER BY o.created_at DESC LIMIT ?';
+        queryParams.push(limit || 1000);
 
-        // 模拟返回数据
-        return [];
+        console.log('Orders SQL:', sql);
+        console.log('Orders params:', queryParams);
+
+        // 執行查詢
+        const orders = await db.query(sql, queryParams);
+        return orders;
     }
 
     async getProductsData(filters, limit) {
-        const query = {};
+        // 构建SQL查询
+        let sql = "SELECT id, name, description, price, stock_quantity, category, created_at, updated_at FROM products WHERE 1=1";
+        const queryParams = [];
 
+        // 添加筛选条件
         if (filters.product_name) {
-            query.name = { $regex: filters.product_name, $options: "i" };
+            sql += ' AND name LIKE ?';
+            queryParams.push(`%${filters.product_name}%`);
         }
 
         if (filters.category) {
-            query.category = { $regex: filters.category, $options: "i" };
+            sql += ' AND category LIKE ?';
+            queryParams.push(`%${filters.category}%`);
         }
 
         if (filters.stock_quantity !== undefined) {
-            query.stock_quantity = { $gte: filters.stock_quantity };
+            sql += ' AND stock_quantity >= ?';
+            queryParams.push(filters.stock_quantity);
         }
 
-        // 这里需要替换为实际的数据库查询
-        // const products = await Product.find(query)
-        //     .sort({ name: 1 })
-        //     .limit(limit);
+        // 添加排序和限制
+        sql += ' ORDER BY name ASC LIMIT ?';
+        queryParams.push(limit || 1000);
 
-        // 模拟返回数据
-        return [];
+        console.log('Products SQL:', sql);
+        console.log('Products params:', queryParams);
+
+        // 执行查询
+        const products = await db.query(sql, queryParams);
+        return products;
     }
 
     async generateExcelFile(data, type, filePath) {
