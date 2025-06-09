@@ -50,6 +50,9 @@ class DashboardController extends Controller
         // Get distinct statuses for dropdown
         $statuses = Order::distinct()->pluck('status')->filter();
 
-        return view('dashboard', compact('orders', 'products', 'statuses'));
+        // Get N8N webhook URL from environment
+        $n8nWebhookUrl = env('N8N_WEBHOOK_URL');
+
+        return view('dashboard', compact('orders', 'products', 'statuses', 'n8nWebhookUrl'));
     }
 }

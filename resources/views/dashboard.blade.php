@@ -183,8 +183,7 @@
                     </div>
                 </div>
             </div>
-            
-            <!-- Chat Section -->
+              <!-- Chat Section -->
             <div class="lg:col-span-1">
                 <div class="bg-white rounded-lg shadow-md p-6 h-full">        
                     <link href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css" rel="stylesheet" />
@@ -192,13 +191,13 @@
                         import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
 
                         createChat({
-                            webhookUrl: 'https://autoflow.ink.net.tw/webhook/96c0bbee-192e-4913-b23a-5fc7c805b3a3/chat'
+                            webhookUrl: '{{ $n8nWebhookUrl ?? '' }}'
                         });
                     </script>            
-                    
+                </div>
             </div>
         </div>
-    </div>    <script>
+    </div><script>
         $(document).ready(function() {
             $.ajaxSetup({
                 headers: {
