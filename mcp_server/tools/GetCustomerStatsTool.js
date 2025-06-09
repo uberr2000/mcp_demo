@@ -1,5 +1,6 @@
 import { BaseTool } from "./BaseTool.js";
 import Joi from "joi";
+import db from "../database.js";
 
 export class GetCustomerStatsTool extends BaseTool {
     get name() {
@@ -84,62 +85,63 @@ export class GetCustomerStatsTool extends BaseTool {
             this.validateInput(params);
 
             // 构建查询条件
-            const matchStage = {};
+            const whereConditions = [];
+            const queryParams = [];
 
             if (params.customer_name) {
-                matchStage.name = {
-                    $regex: params.customer_name,
-                    $options: "i",
-                };
+                whereConditions.push("name LIKE ?");
+                queryParams.push(`%${params.customer_name}%`);
             }
 
             if (params.status && params.status !== "all") {
-                matchStage.status = params.status;
+                whereConditions.push("status = ?");
+                queryParams.push(params.status);
             }
 
             if (params.date_from) {
-                matchStage.created_at = { $gte: new Date(params.date_from) };
+                whereConditions.push("created_at >= ?");
+                queryParams.push(params.date_from);
             }
 
             if (params.date_to) {
-                matchStage.created_at = {
-                    ...matchStage.created_at,
-                    $lte: new Date(params.date_to),
-                };
+                whereConditions.push("created_at <= ?");
+                queryParams.push(params.date_to);
             }
+
+            const whereClause = whereConditions.length > 0 
+                ? "WHERE " + whereConditions.join(" AND ") 
+                : "";
 
             const limit = params.limit || 10;
 
-            // 这里需要替换为实际的数据库聚合查询
-            // const stats = await Order.aggregate([
-            //     { $match: matchStage },
-            //     {
-            //         $group: {
-            //             _id: '$name',
-            //             total_orders: { $sum: 1 },
-            //             total_spending: { $sum: '$amount' },
-            //             avg_order_amount: { $avg: '$amount' },
-            //             first_order_date: { $min: '$created_at' },
-            //             last_order_date: { $max: '$created_at' }
-            //         }
-            //     },
-            //     { $sort: { total_spending: -1 } },
-            //     { $limit: limit }
-            // ]);
+            // 使用真实的MySQL聚合查询
+            const sql = `
+                SELECT 
+                    name as customer_name,
+                    COUNT(*) as total_orders,
+                    SUM(amount) as total_spending,
+                    AVG(amount) as avg_order_amount,
+                    MIN(created_at) as first_order_date,
+                    MAX(created_at) as last_order_date
+                FROM orders
+                ${whereClause}
+                GROUP BY name
+                ORDER BY total_spending DESC
+                LIMIT ?
+            `;
 
-            // 模拟返回数据
-            const stats = [];
+            const stats = await db.query(sql, [...queryParams, limit]);
 
             return {
                 success: true,
                 total: stats.length,
                 stats: stats.map((stat) => ({
-                    customer_name: stat._id,
+                    customer_name: stat.customer_name,
                     total_orders: stat.total_orders,
-                    total_spending: stat.total_spending,
-                    avg_order_amount: stat.avg_order_amount,
-                    first_order_date: stat.first_order_date.toISOString(),
-                    last_order_date: stat.last_order_date.toISOString(),
+                    total_spending: parseFloat(stat.total_spending) || 0,
+                    avg_order_amount: parseFloat(stat.avg_order_amount) || 0,
+                    first_order_date: stat.first_order_date,
+                    last_order_date: stat.last_order_date,
                 })),
             };
         } catch (error) {

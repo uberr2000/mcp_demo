@@ -315,10 +315,10 @@ export class SendExcelEmailTool extends BaseTool {
             data.forEach((order) => {
                 worksheet.addRow({
                     id: order.id,
-                    customer_name: order.name,
-                    product_name: order.product?.name || "Unknown",
+                    customer_name: order.customer_name,
+                    product_name: order.product_name || "Unknown",
                     quantity: order.quantity,
-                    amount: order.amount,
+                    amount: order.price,
                     status: order.status,
                     created_at: new Date(order.created_at).toLocaleString(),
                 });
