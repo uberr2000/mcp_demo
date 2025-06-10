@@ -128,12 +128,12 @@ export class GetOrdersTool extends BaseTool {
                 queryParams.push(`%${params.product_name}%`);
             }
 
-            if (params.min_amount !== undefined) {
+            if (params.min_amount !== undefined && params.min_amount > 0) {
                 sql += ' AND o.amount >= ?';
                 queryParams.push(params.min_amount);
             }
 
-            if (params.max_amount !== undefined) {
+            if (params.max_amount !== undefined && params.max_amount > 0) {
                 sql += ' AND o.amount <= ?';
                 queryParams.push(params.max_amount);
             }
