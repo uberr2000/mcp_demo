@@ -134,6 +134,7 @@ export class SendExcelEmailTool extends BaseTool {
 
     async execute(params) {
         try {
+            console.log('Starting send_excel_email execution...');
             this.validateInput(params);
 
             const {
@@ -144,6 +145,10 @@ export class SendExcelEmailTool extends BaseTool {
                 filters = {},
                 limit = 1000,
             } = params;
+
+            // 限制最大记录数以避免超时
+            const safeLimit = Math.min(limit, 5000);
+            console.log(`Processing ${type} export with limit: ${safeLimit}`);
 
             // 生成文件名
             const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -156,16 +161,33 @@ export class SendExcelEmailTool extends BaseTool {
                 recursive: true,
             });
 
-            // 獲取數據
+            console.log('Fetching data from database...');
+            // 獲取數據 - 添加超时处理
             let data;
-            if (type === "orders") {
-                data = await this.getOrdersData(filters, limit);
-            } else {
-                data = await this.getProductsData(filters, limit);
-            }
+            const dataPromise = type === "orders" 
+                ? this.getOrdersData(filters, safeLimit)
+                : this.getProductsData(filters, safeLimit);
+            
+            data = await Promise.race([
+                dataPromise,
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Database query timeout')), 30000)
+                )
+            ]);
 
-            // 生成 Excel 文件
-            await this.generateExcelFile(data, type, filePath);
+            console.log(`Retrieved ${data.length} records from database`);
+
+            console.log('Generating Excel file...');
+            // 生成 Excel 文件 - 添加超时处理
+            const excelPromise = this.generateExcelFile(data, type, filePath);
+            await Promise.race([
+                excelPromise,
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Excel generation timeout')), 60000)
+                )
+            ]);
+
+            console.log('Excel file generated successfully');
 
             // 發送郵件
             const defaultSubject = `${
@@ -177,16 +199,31 @@ export class SendExcelEmailTool extends BaseTool {
                 data.length
             }`;
 
-            await this.sendEmail(
+            console.log('Sending email...');
+            const emailPromise = this.sendEmail(
                 email,
                 subject || defaultSubject,
                 message || defaultMessage,
                 filePath,
                 filename
             );
+            
+            await Promise.race([
+                emailPromise,
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Email sending timeout')), 120000)
+                )
+            ]);
+
+            console.log('Email sent successfully');
 
             // 清理臨時文件
-            await fs.unlink(filePath);
+            try {
+                await fs.unlink(filePath);
+                console.log('Temporary file cleaned up');
+            } catch (cleanupError) {
+                console.warn('Failed to cleanup temporary file:', cleanupError.message);
+            }
 
             return {
                 success: true,
@@ -201,65 +238,74 @@ export class SendExcelEmailTool extends BaseTool {
                 },
             };
         } catch (error) {
+            console.error('SendExcelEmailTool execution error:', error);
             throw new Error(`發送郵件失敗：${error.message}`);
         }
     }
 
     async getOrdersData(filters, limit) {
-        // 構建SQL查詢
-        let sql = `
-            SELECT 
-                o.id,
-                o.transaction_id,
-                o.name as customer_name,
-                p.name as product_name,
-                o.quantity,
-                o.amount as price,
-                o.status,
-                o.created_at,
-                o.updated_at
-            FROM orders o
-            LEFT JOIN products p ON o.product_id = p.id
-            WHERE 1=1
-        `;
-        const queryParams = [];
+        try {
+            console.log('Fetching orders data with filters:', filters);
+            
+            // 構建SQL查詢
+            let sql = `
+                SELECT 
+                    o.id,
+                    o.transaction_id,
+                    o.name as customer_name,
+                    p.name as product_name,
+                    o.quantity,
+                    o.amount as price,
+                    o.status,
+                    o.created_at,
+                    o.updated_at
+                FROM orders o
+                LEFT JOIN products p ON o.product_id = p.id
+                WHERE 1=1
+            `;
+            const queryParams = [];
 
-        // 添加篩選條件
-        if (filters.status && filters.status !== "all") {
-            sql += ' AND o.status = ?';
-            queryParams.push(filters.status);
+            // 添加篩選條件
+            if (filters.status && filters.status !== "all") {
+                sql += ' AND o.status = ?';
+                queryParams.push(filters.status);
+            }
+
+            if (filters.customer_name) {
+                sql += ' AND o.name LIKE ?';
+                queryParams.push(`%${filters.customer_name}%`);
+            }
+
+            if (filters.product_name) {
+                sql += ' AND p.name LIKE ?';
+                queryParams.push(`%${filters.product_name}%`);
+            }
+
+            if (filters.date_from) {
+                sql += ' AND o.created_at >= ?';
+                queryParams.push(filters.date_from);
+            }
+
+            if (filters.date_to) {
+                sql += ' AND o.created_at <= ?';
+                queryParams.push(filters.date_to + ' 23:59:59');
+            }
+
+            // 添加排序和限制
+            sql += ' ORDER BY o.created_at DESC LIMIT ?';
+            queryParams.push(limit || 1000);
+
+            console.log('Orders SQL:', sql);
+            console.log('Orders params:', queryParams);
+
+            // 執行查詢
+            const orders = await db.query(sql, queryParams);
+            console.log(`Retrieved ${orders.length} orders from database`);
+            return orders;
+        } catch (error) {
+            console.error('Error fetching orders data:', error);
+            throw new Error(`無法獲取訂單數據: ${error.message}`);
         }
-
-        if (filters.customer_name) {
-            sql += ' AND o.name LIKE ?';
-            queryParams.push(`%${filters.customer_name}%`);
-        }
-
-        if (filters.product_name) {
-            sql += ' AND p.name LIKE ?';
-            queryParams.push(`%${filters.product_name}%`);
-        }
-
-        if (filters.date_from) {
-            sql += ' AND o.created_at >= ?';
-            queryParams.push(filters.date_from);
-        }
-
-        if (filters.date_to) {
-            sql += ' AND o.created_at <= ?';
-            queryParams.push(filters.date_to + ' 23:59:59');
-        }
-
-        // 添加排序和限制
-        sql += ' ORDER BY o.created_at DESC LIMIT ?';
-        queryParams.push(limit || 1000);
-
-        console.log('Orders SQL:', sql);
-        console.log('Orders params:', queryParams);
-
-        // 執行查詢
-        const orders = await db.query(sql, queryParams);
-        return orders;
     }
 
     async getProductsData(filters, limit) {
