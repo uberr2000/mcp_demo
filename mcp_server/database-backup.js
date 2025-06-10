@@ -11,16 +11,14 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 class Database {
     constructor() {
-        this.pool = null;
-    }
-
-    async connect() {
-        if (this.pool) {
-            return this.pool;
+        this.connection = null;
+    }    async connect() {
+        if (this.connection) {
+            return this.connection;
         }
 
         try {
-            this.pool = mysql.createPool({
+            this.connection = await mysql.createConnection({
                 host: process.env.DB_HOST || '127.0.0.1',
                 port: process.env.DB_PORT || 3306,
                 user: process.env.DB_USERNAME || 'root',
@@ -29,7 +27,6 @@ class Database {
                 timezone: '+00:00',
                 // 连接池配置
                 connectionLimit: 10,
-                queueLimit: 0,
                 // 自动重连配置
                 reconnect: true,
                 // 连接超时配置
@@ -42,37 +39,43 @@ class Database {
                 enableKeepAlive: true
             });
 
-            console.log('Database pool created successfully');
-            return this.pool;
+            console.log('Database connected successfully');
+            return this.connection;
         } catch (error) {
-            console.error('Database pool creation failed:', error);
+            console.error('Database connection failed:', error);
             throw error;
         }
-    }
-
-    async query(sql, params = []) {
+    }async query(sql, params = []) {
         try {
-            // 确保连接池已创建
-            if (!this.pool) {
+            // 检查连接是否存在且有效
+            if (!this.connection) {
                 await this.connect();
+            } else {
+                // 检查连接是否仍然有效
+                try {
+                    await this.connection.ping();
+                } catch (pingError) {
+                    console.log('Connection lost, reconnecting...');
+                    this.connection = null;
+                    await this.connect();
+                }
             }
             
-            // 从连接池获取连接并执行查询
-            const [rows] = await this.pool.query(sql, params);
+            // 使用 query 而不是 execute 來處理參數化查詢
+            const [rows] = await this.connection.query(sql, params);
             return rows;
         } catch (error) {
             console.error('Database query error:', error);
             
-            // 如果是连接错误，尝试重新创建连接池
+            // 如果是连接错误，尝试重连一次
             if (error.code === 'PROTOCOL_CONNECTION_LOST' || 
                 error.code === 'ECONNRESET' || 
-                error.message.includes('closed state') ||
-                error.message.includes('Connection lost')) {
-                console.log('Connection error detected, recreating pool...');
-                this.pool = null;
+                error.message.includes('closed state')) {
+                console.log('Connection error detected, attempting to reconnect...');
+                this.connection = null;
                 try {
                     await this.connect();
-                    const [rows] = await this.pool.query(sql, params);
+                    const [rows] = await this.connection.query(sql, params);
                     return rows;
                 } catch (retryError) {
                     console.error('Retry connection failed:', retryError);
@@ -85,10 +88,10 @@ class Database {
     }
 
     async close() {
-        if (this.pool) {
-            await this.pool.end();
-            this.pool = null;
-            console.log('Database pool closed');
+        if (this.connection) {
+            await this.connection.end();
+            this.connection = null;
+            console.log('Database connection closed');
         }
     }
 }
